@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APC Pre-Production Dashboard — Preview</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#0b0b0b;background:#f5f4f0;height:100vh;overflow:hidden}
+.shell{display:flex;flex-direction:column;height:100vh}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#fff;border-bottom:0.5px solid rgba(11,11,11,0.1);flex-shrink:0}
+.topbar-title{font-size:16px;font-weight:500}
+.topbar-back{font-size:12px;color:#52514e;text-decoration:none;padding:4px 10px;border:0.5px solid rgba(11,11,11,0.15);border-radius:8px}
+.topbar-back:hover{background:#f5f4f0}
+.topbar-date{font-size:12px;color:#52514e;background:#f5f4f0;border:0.5px solid rgba(11,11,11,0.1);border-radius:8px;padding:4px 10px}
+.cat-switch{display:flex;gap:4px;background:#f5f4f0;border-radius:8px;padding:3px}
+.cat-btn{font-size:12px;padding:4px 12px;border:none;border-radius:6px;background:transparent;color:#52514e;cursor:pointer}
+.cat-btn.active{background:#fff;color:#185fa5;box-shadow:0 1px 2px rgba(11,11,11,0.08)}
+.tabs{display:flex;padding:0 20px;background:#fff;border-bottom:0.5px solid rgba(11,11,11,0.1);flex-shrink:0}
+.tab{padding:10px 18px;font-size:13px;color:#52514e;cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:#185fa5;border-bottom-color:#2a78d6}
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:340px;flex-shrink:0;border-right:0.5px solid rgba(11,11,11,0.1);overflow-y:auto;background:#fcfcfb}
+.sidebar-header{padding:12px 16px;border-bottom:0.5px solid rgba(11,11,11,0.1);display:flex;gap:8px}
+.sidebar-header input{flex:1;font-size:13px;padding:6px 10px;border:0.5px solid rgba(11,11,11,0.1);border-radius:8px;background:#fff;color:#0b0b0b;outline:none}
+.filter-row{padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:0.5px solid rgba(11,11,11,0.1)}
+.chip{font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid rgba(11,11,11,0.1);background:#fff;color:#52514e;cursor:pointer;white-space:nowrap}
+.chip.active{background:#e6f1fb;border-color:#b5d4f4;color:#185fa5}
+.ncode-row{padding:10px 16px;border-bottom:0.5px solid rgba(11,11,11,0.1);cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s}
+.ncode-row:hover{background:#f5f4f0}
+.ncode-row.selected{background:#e6f1fb}
+.ncode-row.selected .nr-code{color:#185fa5}
+.nr-info{flex:1;min-width:0}
+.nr-code{font-size:13px;font-weight:500;font-family:'SF Mono',monospace}
+.nr-sub{font-size:11px;color:#52514e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.nr-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.badge{font-size:10px;padding:2px 6px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-HIGH{background:#eaf3de;color:#3b6d11}
+.badge-MID{background:#faeeda;color:#854f0b}
+.badge-LOW{background:#fcebeb;color:#a32d2d}
+.badge-STATC{background:#eeedfe;color:#3c3489}
+.badge-FALLBACK{background:#f1efe8;color:#5f5e5a}
+.badge-NONE{background:#f1efe8;color:#898781}
+.nr-q4{font-size:12px;color:#52514e;font-family:'SF Mono',monospace}
+.detail{flex:1;overflow-y:auto;background:#f5f4f0}
+.empty-state{padding:60px 20px;text-align:center;color:#898781;font-size:13px}
+.detail-header{padding:16px 20px;background:#fff;border-bottom:0.5px solid rgba(11,11,11,0.1)}
+.dh-top{display:flex;align-items:center;gap:12px}
+.dh-code{font-size:18px;font-weight:500;font-family:'SF Mono',monospace}
+.dh-name{font-size:13px;color:#52514e}
+.dh-badges{display:flex;gap:6px;margin-left:auto}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px 20px}
+.kpi{background:#fff;border-radius:8px;padding:12px 14px}
+.kpi-label{font-size:11px;color:#52514e;margin-bottom:4px}
+.kpi-val{font-size:20px;font-weight:500}
+.kpi-val.accent{color:#185fa5}
+.kpi-val.success{color:#3b6d11}
+.kpi-val.warn{color:#854f0b}
+.kpi-delta{font-size:11px;margin-top:2px}
+.kpi-delta.up{color:#3b6d11}
+.kpi-delta.dn{color:#a32d2d}
+.nr-delta{font-size:10px;font-family:'SF Mono',monospace}
+.nr-delta.up{color:#3b6d11}
+.nr-delta.dn{color:#a32d2d}
+.cust-ncode-chip{display:inline-block;font-size:11px;font-family:'SF Mono',monospace;padding:2px 8px;border:0.5px solid rgba(11,11,11,0.12);border-radius:6px;background:#fff;margin:2px;cursor:pointer}
+.cust-ncode-chip:hover{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.section{padding:0 20px 20px}
+.section-title{font-size:11px;font-weight:500;color:#52514e;margin-bottom:10px;padding-top:16px;text-transform:uppercase;letter-spacing:0.05em}
+.layer-table{width:100%;border-collapse:collapse;font-size:13px}
+.layer-table th{text-align:left;padding:6px 10px;color:#898781;font-weight:400;font-size:11px;border-bottom:0.5px solid rgba(11,11,11,0.1)}
+.layer-table td{padding:8px 10px;border-bottom:0.5px solid rgba(11,11,11,0.1);background:#fff}
+.layer-table tr:last-child td{border-bottom:none}
+.layer-table tr:hover td{background:#f5f4f0}
+.lyr-icon{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;margin-right:6px;flex-shrink:0;vertical-align:middle}
+.lyr1{background:#e6f1fb;color:#185fa5}
+.lyr2{background:#eaf3de;color:#3b6d11}
+.lyr3{background:#eeedfe;color:#3c3489}
+.num{font-family:'SF Mono',monospace;font-size:13px;text-align:right}
+.num.pos{color:#3b6d11}
+.num.zero{color:#898781}
+.chart-wrap{padding:0 20px 20px}
+.chart-box{background:#fff;border:0.5px solid rgba(11,11,11,0.1);border-radius:12px;padding:16px}
+.chart-controls{display:flex;gap:6px;margin-bottom:12px;align-items:center}
+.chart-controls span.label{font-size:13px;font-weight:500;color:#0b0b0b;margin-right:4px}
+.chart-btn{font-size:11px;padding:4px 10px;border:0.5px solid rgba(11,11,11,0.1);border-radius:20px;background:#f5f4f0;color:#52514e;cursor:pointer}
+.chart-btn.active{background:#e6f1fb;border-color:#b5d4f4;color:#185fa5}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#52514e}
+.leg-dash{width:16px;height:2px;border-radius:1px;flex-shrink:0}
+.override-row{display:flex;gap:8px;align-items:center;padding:10px 20px;background:#faeeda;border-top:0.5px solid #f5c56f}
+.override-row .or-label{font-size:12px;color:#854f0b;flex:1}
+.override-row input{width:110px;font-size:13px;padding:5px 8px;border:0.5px solid rgba(11,11,11,0.1);border-radius:8px;background:#fff;color:#0b0b0b;font-family:'SF Mono',monospace}
+.override-row button{font-size:12px;padding:5px 14px;border:0.5px solid rgba(11,11,11,0.15);border-radius:8px;background:#fff;cursor:pointer}
+.grade-table{width:100%;border-collapse:collapse;font-size:13px}
+.grade-table th{text-align:right;padding:7px 10px;color:#898781;font-weight:400;font-size:11px;border-bottom:0.5px solid rgba(11,11,11,0.1);background:#fff}
+.grade-table th:first-child{text-align:left}
+.grade-table td{padding:9px 10px;border-bottom:0.5px solid rgba(11,11,11,0.1);text-align:right;font-family:'SF Mono',monospace;background:#fff}
+.grade-table td:first-child{text-align:left;font-family:inherit;font-weight:500}
+.grade-table tr.total td{font-weight:500;background:#f5f4f0}
+.grade-table tr:hover:not(.total) td{background:#f5f4f0}
+.conf-bar{display:flex;gap:3px;justify-content:flex-end;flex-wrap:wrap;max-width:160px;margin-left:auto}
+.conf-count{font-size:11px;color:#52514e;font-family:'SF Mono',monospace}
+.conf-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.sply-val{color:#898781}
+.grade-summary-wrap{padding:16px 20px}
+button{font-family:inherit;cursor:pointer}
+.sidebar-header select{font-size:12px;padding:6px 8px;border:0.5px solid rgba(11,11,11,0.1);border-radius:8px;background:#fff;color:#52514e;outline:none;cursor:pointer}
+.cov-track{height:4px;border-radius:2px;background:rgba(11,11,11,0.08);margin-top:5px;overflow:hidden}
+.cov-fill{height:100%;border-radius:2px}
+.nr-need{font-size:10px;color:#a32d2d;font-family:'SF Mono',monospace}
+.nr-ok{font-size:10px;color:#3b6d11}
+.leg-item.clickable{cursor:pointer;user-select:none;padding:2px 6px;border-radius:6px}
+.leg-item.clickable:hover{background:#f5f4f0}
+.leg-item.off{opacity:0.35;text-decoration:line-through}
+.grade-table th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+.grade-table th.sortable:hover{color:#185fa5}
+.grade-table tbody tr.clickable{cursor:pointer}
+.prio-track{flex:1;height:10px;border-radius:4px;background:rgba(11,11,11,0.06);overflow:hidden;min-width:80px}
+.prio-fill{height:100%;border-radius:4px;background:#e24b4a}
+.prio-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <span class="topbar-title">APC Pre-Production Dashboard</span>
+    <a class="topbar-back" href="/">← Overview</a>
+    <span class="topbar-date" id="dateLabel">As of —</span>
+    <div class="cat-switch" id="catSwitch">
+      <button class="cat-btn active" onclick="switchCategory('Standard', this)">Standard (2B)</button>
+      <button class="cat-btn" onclick="switchCategory('Precision', this)">Precision (Pre)</button>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button style="font-size:12px;padding:5px 14px;border:0.5px solid rgba(11,11,11,0.15);border-radius:8px;background:#fff" onclick="location.href='/upload'">Upload Data</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(0,this)">Status</div>
+    <div class="tab" onclick="switchTab(1,this)">Forecast (26Q4)</div>
+    <div class="tab" onclick="switchTab(2,this)">Order Priority</div>
+    <div class="tab" onclick="switchTab(3,this)">Customers</div>
+    <div class="tab" onclick="switchTab(4,this)">Grade Summary</div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <input type="text" placeholder="Search N-code, Grade, Customer..." id="searchInput" oninput="filterList()">
+        <select id="sortSelect" onchange="setSort(this.value)" title="Sort N-code list">
+          <option value="urgency">Sort: Urgent first</option>
+          <option value="q4">Sort: Q4 Forecast</option>
+          <option value="coverage">Sort: Low coverage</option>
+          <option value="code" selected>Sort: N-code</option>
+        </select>
+      </div>
+      <div class="filter-row" id="filterRow"></div>
+      <div class="filter-row" id="confRow">
+        <span class="chip active" onclick="setConf('ALL',this)">All conf.</span>
+        <span class="chip" onclick="setConf('HIGH',this)">HIGH</span>
+        <span class="chip" onclick="setConf('MID',this)">MID</span>
+        <span class="chip" onclick="setConf('LOW',this)">LOW</span>
+        <span class="chip" id="needChip" onclick="toggleNeedFilter(this)" style="margin-left:auto">Needs order</span>
+      </div>
+      <div id="ncodeList"></div>
+    </div>
+    <div class="detail" id="detailPanel"></div>
+  </div>
+</div>
+
+<script>
+/* SPLY (same period last year) / seasonality index can't be computed — no 2025
+   actuals in the DB (see TASK.md 11.8). Structure/columns/legend are kept, values
+   are left as '—'. */
+const Q4_LABELS = ['OCT', 'NOV', 'DEC'];
+let NCODES = [];
+let GRADES = [];
+let HIST_MONTHS = [];
+let ASOF = null;
+let CATEGORY = 'Standard';
+let GRADE_SUMMARY = null;
+let PREV_ASOF = null;   // previous snapshot date (week-over-week deltas), null when none
+let CUSTOMERS = null;   // Customers tab data cache, invalidated on category switch
+
+let currentTab = 0, selectedIdx = 0, filterGrade = 'ALL', chartInst = null;
+let filterConf = 'ALL', filterNeed = false, sortMode = 'code';
+
+/* ── urgency helpers (shared by sidebar sort, Order Priority tab, grade drill-down) ── */
+const q4Total = n => n.q4.reduce((a,b) => a+b, 0);
+const addNeeded = n => Math.max(q4Total(n) - (n.current.ordered_mt || 0), 0);
+// coverage % of the Q4 forecast already ordered; no forecast → treat as fully covered
+const covPct = n => { const q = q4Total(n); return q > 0 ? Math.min((n.current.ordered_mt || 0) / q * 100, 100) : 100; };
+const covColor = p => p >= 99.5 ? '#639922' : p >= 70 ? '#eda100' : '#e24b4a';
+const SORTS = {
+  urgency:  (a,b) => addNeeded(b) - addNeeded(a) || q4Total(b) - q4Total(a),
+  q4:       (a,b) => q4Total(b) - q4Total(a),
+  coverage: (a,b) => covPct(a) - covPct(b) || q4Total(b) - q4Total(a),
+  code:     (a,b) => a.code.localeCompare(b.code),
+};
+
+// Deep-link support: /dashboard-v2?category=Standard&ncode=N14593 (used by the Weekly
+// Changes page to jump straight to a newly-ordered N-code's forecast). Consumed once so
+// switching categories/tabs afterward behaves normally.
+const _urlParams = new URLSearchParams(window.location.search);
+let _deepLinkNcode = _urlParams.get('ncode');
+// Bookmarkable tab deep-link: /dashboard-v2?tab=priority (status/forecast/priority/customers/grade)
+let _tabParam = ({status:0, forecast:1, priority:2, customers:3, grade:4})[_urlParams.get('tab')] ?? null;
+if (_urlParams.get('category') === 'Precision') {
+  CATEGORY = 'Precision';
+  document.querySelectorAll('#catSwitch .cat-btn').forEach((b, i) => b.classList.toggle('active', i === 1));
+}
+
+/* ── utils ── */
+const fmt  = n => (n === null || n === undefined || n === 0) ? '—' : n.toLocaleString(undefined, {maximumFractionDigits: 2});
+const fmtN = n => (n === null || n === undefined) ? '—' : n.toLocaleString(undefined, {maximumFractionDigits: 2});
+const confLabel = c => ({HIGH:'HIGH',MID:'MID',LOW:'LOW',STATC:'STAT-C',FALLBACK:'FALLBACK'})[c] || '—';
+const confClass = c => 'badge badge-' + (c || 'NONE');
+
+/* ── data load ── */
+async function loadData() {
+  const [ncodeRes, gradeRes] = await Promise.all([
+    fetch(`/api/v2/ncodes/${CATEGORY}`),
+    fetch(`/api/v2/grade-summary/${CATEGORY}`),
+  ]);
+  const ncodeData = await ncodeRes.json();
+  GRADE_SUMMARY = await gradeRes.json();
+  NCODES = ncodeData.ncodes;
+  GRADES = ncodeData.grades;
+  HIST_MONTHS = ncodeData.history_months;
+  ASOF = ncodeData.as_of_date;
+  PREV_ASOF = ncodeData.prev_as_of_date || null;
+  CUSTOMERS = null;
+  document.getElementById('dateLabel').textContent = ASOF ? `As of ${ASOF}` : 'As of —';
+  selectedIdx = 0;
+  filterGrade = 'ALL';
+  filterConf = 'ALL'; filterNeed = false;
+  document.querySelectorAll('#confRow .chip').forEach((c, i) => c.classList.toggle('active', i === 0));
+  if (_deepLinkNcode) {
+    const idx = NCODES.findIndex(n => n.code === _deepLinkNcode);
+    if (idx >= 0) {
+      selectedIdx = idx;
+      currentTab = 1;
+      document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 1));
+    }
+    _deepLinkNcode = null;
+  }
+  if (_tabParam != null) {
+    currentTab = _tabParam;
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === currentTab));
+    _tabParam = null;
+  }
+  document.getElementById('sidebar').style.display = currentTab >= 2 ? 'none' : '';
+  buildFilterChips();
+  buildSidebar();
+  if (currentTab === 2) renderPriorityTab();
+  else if (currentTab === 3) renderCustomerTab();
+  else if (currentTab === 4) renderGradeTab();
+  else renderDetail();
+}
+
+function switchCategory(cat, el) {
+  CATEGORY = cat;
+  document.querySelectorAll('#catSwitch .cat-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadData();
+}
+
+/* ── sidebar rendering ── */
+function buildFilterChips() {
+  const row = document.getElementById('filterRow');
+  const chips = ['ALL', ...GRADES];
+  row.innerHTML = chips.map(g =>
+    `<span class="chip${g===filterGrade?' active':''}" onclick="setGrade('${g}',this)">${g==='ALL'?'All':g}</span>`
+  ).join('');
+}
+
+function buildSidebar() {
+  const list = document.getElementById('ncodeList');
+  if (!NCODES.length) {
+    list.innerHTML = '<div class="empty-state">No N-code data.<br>Please upload the main sheet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  // render in sortMode order but keep selectedIdx pointing into the original NCODES array
+  const order = NCODES.map((_, i) => i).sort((x, y) => SORTS[sortMode](NCODES[x], NCODES[y]));
+  order.forEach((i) => {
+    const n = NCODES[i];
+    const q4tot = q4Total(n);
+    const need = addNeeded(n);
+    const pct = covPct(n);
+    const el = document.createElement('div');
+    el.className = 'ncode-row' + (i === selectedIdx ? ' selected' : '');
+    el.dataset.code = n.code; el.dataset.grade = n.grade || ''; el.dataset.cust = n.customer || '';
+    el.dataset.conf = n.confidence || ''; el.dataset.need = need > 0 ? '1' : '0';
+    el.innerHTML = `
+      <div class="nr-info">
+        <div class="nr-code">${n.code}</div>
+        <div class="nr-sub">${n.grade || '—'} · ${n.thickness_mm ?? '—'}mm · W${n.width_mm ?? '—'} · ${n.customer}</div>
+        <div class="cov-track" title="Ordered ${fmtN(n.current.ordered_mt||0)} / Forecast ${fmtN(q4tot)} MT (${Math.round(pct)}%)">
+          <div class="cov-fill" style="width:${pct}%;background:${covColor(pct)}"></div>
+        </div>
+      </div>
+      <div class="nr-right">
+        <div style="display:flex;gap:4px">${n.override_mt != null ? '<span class="badge" style="background:#faeeda;color:#854f0b">OVR</span>' : ''}<span class="${confClass(n.confidence)}">${confLabel(n.confidence)}</span></div>
+        <span class="nr-q4">${fmtN(q4tot)} MT${n.delta && Math.abs(n.delta.q4_mt) >= 0.005 ? ` <span class="nr-delta ${n.delta.q4_mt>0?'up':'dn'}" title="vs ${PREV_ASOF}">${n.delta.q4_mt>0?'▲':'▼'}${fmtN(Math.abs(n.delta.q4_mt))}</span>` : ''}</span>
+        ${need > 0 ? `<span class="nr-need">need +${fmtN(need)}</span>` : '<span class="nr-ok">✓ covered</span>'}
+      </div>`;
+    el.onclick = () => { selectedIdx = i; buildSidebar(); renderDetail(); };
+    list.appendChild(el);
+  });
+  filterList();
+}
+
+function setSort(v) {
+  sortMode = v;
+  buildSidebar();
+}
+
+function filterList() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.ncode-row').forEach(r => {
+    const match = r.dataset.code.toLowerCase().includes(q) ||
+                  r.dataset.grade.toLowerCase().includes(q) ||
+                  r.dataset.cust.toLowerCase().includes(q);
+    const gMatch = filterGrade === 'ALL' || r.dataset.grade === filterGrade;
+    const cMatch = filterConf === 'ALL' || r.dataset.conf === filterConf;
+    const nMatch = !filterNeed || r.dataset.need === '1';
+    r.style.display = (match && gMatch && cMatch && nMatch) ? '' : 'none';
+  });
+}
+
+function setConf(c, el) {
+  filterConf = c;
+  document.querySelectorAll('#confRow .chip:not(#needChip)').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  filterList();
+}
+
+function toggleNeedFilter(el) {
+  filterNeed = !filterNeed;
+  el.classList.toggle('active', filterNeed);
+  filterList();
+}
+
+function setGrade(g, el) {
+  filterGrade = g;
+  document.querySelectorAll('#filterRow .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  filterList();
+}
+
+/* ── tab switching ── */
+function switchTab(idx, el) {
+  currentTab = idx;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const sb = document.getElementById('sidebar');
+  if (idx === 2)      { sb.style.display = 'none'; renderPriorityTab(); }
+  else if (idx === 3) { sb.style.display = 'none'; renderCustomerTab(); }
+  else if (idx === 4) { sb.style.display = 'none'; renderGradeTab(); }
+  else                { sb.style.display = ''; renderDetail(); }
+}
+
+/* Jump from the Order Priority / Grade Summary tabs straight to one N-code's Forecast view */
+function jumpToNcode(code) {
+  const idx = NCODES.findIndex(n => n.code === code);
+  if (idx < 0) return;
+  selectedIdx = idx;
+  currentTab = 1;
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 1));
+  document.getElementById('sidebar').style.display = '';
+  buildSidebar();
+  renderDetail();
+}
+
+function renderDetail() {
+  if (!NCODES.length) {
+    document.getElementById('detailPanel').innerHTML = '<div class="empty-state">Select an N-code.</div>';
+    return;
+  }
+  if (currentTab === 0) renderStatusDetail();
+  else if (currentTab === 1) renderForecastDetail();
+}
+
+/* ── Status tab detail panel (actual current stock/production status from ncode_items) ── */
+function renderStatusDetail() {
+  const d = NCODES[selectedIdx];
+  const c = d.current;
+  const inputRate = c.order_balance_mt !== 0 || c.produced_mt !== 0
+    ? Math.round(c.produced_mt / (c.produced_mt + Math.max(c.order_balance_mt, 0)) * 100) || 0
+    : 0;
+
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="detail-header">
+      <div class="dh-top">
+        <span class="dh-code">${d.code}</span>
+        <span class="dh-name">${d.grade || '—'} · ${d.thickness_mm ?? '—'}mm · W${d.width_mm ?? '—'} · ${d.customer}</span>
+        <div class="dh-badges">
+          <span class="badge" style="background:#e6f1fb;color:#185fa5">${CATEGORY}</span>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Order Balance (MT)</div><div class="kpi-val ${c.order_balance_mt<0?'warn':''}">${fmt(c.order_balance_mt)}</div></div>
+      <div class="kpi"><div class="kpi-label">Produced (MT)</div><div class="kpi-val success">${fmt(c.produced_mt)}</div></div>
+      <div class="kpi"><div class="kpi-label">Production Balance (MT)</div><div class="kpi-val warn">${fmt(c.production_balance_mt)}</div></div>
+      <div class="kpi"><div class="kpi-label">26Q4 Final Forecast</div><div class="kpi-val accent">${fmtN(d.q4.reduce((a,b)=>a+b,0))} MT</div></div>
+    </div>
+    ${layerSection(d)}
+    ${chartSection(d)}`;
+  drawChart(d, 6);
+}
+
+// Q4 Total Forecast, Booked+FCST Coverage, Ordered/Additional-Needed KPIs, and the
+// layer table — everything on the Forecast tab that changes when a Customer Forecast
+// cell is saved, aside from the chart. Kept separate from the editable table below it
+// so a save can refresh these live without rebuilding the input the user is typing in.
+function forecastKpisHtml(d) {
+  const q4tot = d.q4.reduce((a,b) => a+b, 0);
+  const bookedTot = d.layers.booked.reduce((a,b)=>a+b,0);
+  const fcstTot = d.layers.cust_fcst.reduce((a,b)=>a+b,0);
+  const orderCover = q4tot > 0 ? Math.round((bookedTot+fcstTot) / q4tot * 100) : 0;
+  // Ordered = James Preparation qty (what we've already ordered from the factory —
+  // same figure as the Overview "SDG Order" / detail page "Order Qty"). Additional
+  // Needed = the gap still left to cover the Q4 Final Forecast.
+  const orderedMt = d.current.ordered_mt || 0;
+  const additionalNeeded = Math.max(q4tot - orderedMt, 0);
+  return `
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Q4 Total Forecast${d.override_mt != null ? ' <span style="color:#854f0b">✎ override</span>' : ''}</div><div class="kpi-val">${fmtN(q4tot)} MT</div>${d.delta && Math.abs(d.delta.q4_mt) >= 0.005 ? `<div class="kpi-delta ${d.delta.q4_mt>0?'up':'dn'}">${d.delta.q4_mt>0?'▲':'▼'} ${fmtN(Math.abs(d.delta.q4_mt))} MT vs ${PREV_ASOF}</div>` : ''}</div>
+      <div class="kpi"><div class="kpi-label">Booked+FCST Coverage</div><div class="kpi-val ${orderCover>=70?'success':'warn'}">${orderCover}%</div></div>
+      <div class="kpi"><div class="kpi-label">vs SPLY</div><div class="kpi-val">— <span style="font-size:10px;color:#898781">(no 2025 actuals)</span></div></div>
+      <div class="kpi"><div class="kpi-label">Forecast Model</div><div class="kpi-val" style="font-size:13px;color:#52514e">${d.model}</div></div>
+      <div class="kpi"><div class="kpi-label">Ordered (James Prep)</div><div class="kpi-val" style="color:#0d9488">${fmtN(orderedMt)} MT</div>${d.delta && Math.abs(d.delta.ordered_mt) >= 0.005 ? `<div class="kpi-delta ${d.delta.ordered_mt>0?'up':'dn'}">${d.delta.ordered_mt>0?'▲':'▼'} ${fmtN(Math.abs(d.delta.ordered_mt))} MT vs ${PREV_ASOF}</div>` : ''}</div>
+      <div class="kpi"><div class="kpi-label">Additional Order Needed</div><div class="kpi-val ${additionalNeeded>0?'warn':'success'}">${fmtN(additionalNeeded)} MT</div></div>
+    </div>
+    ${layerSection(d)}`;
+}
+
+/* ── Forecast tab detail panel ── */
+let currentChartRange = 6;
+
+function renderForecastDetail() {
+  const d = NCODES[selectedIdx];
+  const q4tot = d.q4.reduce((a,b) => a+b, 0);
+  const additionalNeeded = Math.max(q4tot - (d.current.ordered_mt || 0), 0);
+  currentChartRange = 6;
+
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="detail-header">
+      <div class="dh-top">
+        <span class="dh-code">${d.code}</span>
+        <span class="dh-name">${d.grade || '—'} · ${d.thickness_mm ?? '—'}mm · W${d.width_mm ?? '—'} · ${d.customer}</span>
+        <div class="dh-badges">
+          <span class="${confClass(d.confidence)}">${confLabel(d.confidence)}</span>
+          <span class="badge" style="background:#eeedfe;color:#3c3489">${d.model}</span>
+        </div>
+      </div>
+    </div>
+    <div id="forecastDynamicSection">${forecastKpisHtml(d)}</div>
+    <div class="section">
+      <div class="section-title">Customer Forecast / Consignment Stock Entry</div>
+      <div id="fcstEntryContainer" style="font-size:12px;color:#898781;padding:10px 0">Loading...</div>
+    </div>
+    ${chartSection(d)}
+    <div class="section">
+      <div class="section-title">Order Request — Group N-code</div>
+      <div id="orderReqPanel" style="font-size:12px;color:#898781">Loading...</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Order Request — Individual N-codes in this group</div>
+      <div id="individualReqPanel" style="font-size:12px;color:#898781">Loading...</div>
+    </div>
+    <div class="override-row">
+      <span style="font-size:14px;color:#854f0b;margin-right:4px">✎</span>
+      <span class="or-label">${d.override_mt != null
+        ? `Q4 Manual Override active: <b>${fmtN(d.override_mt)} MT</b> (model forecast ${fmtN(d.computed_q4_mt)} MT)`
+        : 'Q4 Manual Override — replaces the Q4 Final Forecast total'}</span>
+      <span id="overrideMsg" style="font-size:11px"></span>
+      <input type="number" step="0.001" min="0" id="overrideInput" placeholder="${fmtN(d.computed_q4_mt ?? q4tot)}" value="${d.override_mt ?? ''}">
+      <button onclick="applyOverride()">Save</button>
+      ${d.override_mt != null ? '<button onclick="clearOverride()">Clear</button>' : ''}
+    </div>`;
+  drawChart(d, currentChartRange);
+  loadForecastEntryTable(d);
+  loadOrderRequestPanel(d, additionalNeeded);
+  loadIndividualReqPanel(d);
+}
+
+/* ── Customer Forecast / Consignment Stock entry (ported from the old Overview 26Q4 section) ── */
+async function loadForecastEntryTable(d) {
+  const container = document.getElementById('fcstEntryContainer');
+  if (!container) return;
+  try {
+    const res = await fetch(`/api/q4-ncodes/${CATEGORY}?grade=${encodeURIComponent(d.grade || 'Unknown')}`);
+    const data = await res.json();
+    const rows = (data.ncodes || []).filter(nc => nc.n_code === d.code);
+    container.innerHTML = buildForecastEntryTable(rows);
+  } catch (e) {
+    container.innerHTML = '<div style="color:#e24b4a;font-size:12px">Failed to load</div>';
+  }
+}
+
+function buildForecastEntryTable(rows) {
+  const fcstCell = (nc, monthKey, val) => `
+    <input type="number" step="0.001" value="${val ?? ''}"
+      data-ncode="${nc.n_code || ''}" data-thickness="${nc.thickness_mm ?? ''}"
+      data-width="${nc.width_mm ?? ''}" data-shipto="${(nc.ship_to || '').replace(/"/g, '&quot;')}"
+      data-month="${monthKey}" onchange="saveQ4ForecastCell(this)"
+      style="width:80px;padding:4px 6px;border:0.5px solid rgba(11,11,11,0.15);border-radius:6px;font-size:12px;text-align:right">`;
+  const stockCell = (nc) => `
+    <input type="number" step="0.001" value="${nc.consignment_mt ?? ''}"
+      data-ncode="${nc.n_code || ''}" data-thickness="${nc.thickness_mm ?? ''}"
+      data-width="${nc.width_mm ?? ''}" data-shipto="${(nc.ship_to || '').replace(/"/g, '&quot;')}"
+      onchange="saveQ4ConsignmentCell(this)"
+      style="width:80px;padding:4px 6px;border:0.5px solid #9bd4c8;border-radius:6px;font-size:12px;text-align:right;background:#eefaf6">`;
+
+  if (!rows.length) {
+    return '<div style="color:#898781;font-size:12px">No spec info for this N-code.</div>';
+  }
+  const bodyRows = rows.map(nc => `
+    <tr>
+      <td style="padding:6px 10px;font-family:'SF Mono',monospace;font-size:12px">${nc.thickness_mm ?? '—'}mm / W${nc.width_mm ?? '—'}${nc.matched ? '' : ' <span style="font-size:10px;color:#854f0b" title="Does not match a main sheet spec">⚠</span>'}</td>
+      <td style="padding:6px 10px;font-size:12px">${nc.ship_to || '—'}</td>
+      <td style="padding:6px 10px">${fcstCell(nc, '2026-10', nc.fcst_oct)}</td>
+      <td style="padding:6px 10px">${fcstCell(nc, '2026-11', nc.fcst_nov)}</td>
+      <td style="padding:6px 10px">${fcstCell(nc, '2026-12', nc.fcst_dec)}</td>
+      <td style="padding:6px 10px">${stockCell(nc)}</td>
+    </tr>`).join('');
+
+  return `<table class="layer-table">
+    <thead><tr>
+      <th>Spec</th><th>Ship-to</th>
+      <th style="text-align:right;color:#7c5ac9">2026-10</th>
+      <th style="text-align:right;color:#7c5ac9">2026-11</th>
+      <th style="text-align:right;color:#7c5ac9">2026-12</th>
+      <th style="text-align:right;color:#0891b2">Consign Stock</th>
+    </tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>`;
+}
+
+// Re-fetch this category's N-codes (so the just-saved Customer Forecast/Consignment
+// value flows through compute_ncode_q4_forecast) and refresh the KPIs/layer table/chart
+// in place, without touching the editable table itself (would lose input focus) or the
+// sidebar filter/search state.
+async function refreshForecastData() {
+  const currentCode = NCODES[selectedIdx] ? NCODES[selectedIdx].code : null;
+  if (!currentCode) return;
+  const res = await fetch(`/api/v2/ncodes/${CATEGORY}`);
+  const data = await res.json();
+  NCODES = data.ncodes;
+  const idx = NCODES.findIndex(n => n.code === currentCode);
+  if (idx < 0) return;
+  selectedIdx = idx;
+  const d = NCODES[idx];
+  const container = document.getElementById('forecastDynamicSection');
+  if (container) container.innerHTML = forecastKpisHtml(d);
+  drawChart(d, currentChartRange);
+  buildSidebar();
+}
+
+async function saveQ4ForecastCell(input) {
+  const payload = {
+    ncode: input.dataset.ncode,
+    thickness_mm: input.dataset.thickness ? parseFloat(input.dataset.thickness) : null,
+    width_mm: input.dataset.width ? parseFloat(input.dataset.width) : null,
+    ship_to: input.dataset.shipto || '',
+    year_month: input.dataset.month,
+    forecast_mt: input.value === '' ? null : parseFloat(input.value),
+  };
+  input.disabled = true;
+  try {
+    const res = await fetch('/api/customer-forecast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('save failed');
+    input.style.borderColor = '#3b6d11';
+    setTimeout(() => { input.style.borderColor = ''; }, 800);
+    await refreshForecastData();
+  } catch (e) {
+    input.style.borderColor = '#e24b4a';
+  } finally {
+    input.disabled = false;
+  }
+}
+
+async function saveQ4ConsignmentCell(input) {
+  const payload = {
+    ncode: input.dataset.ncode,
+    thickness_mm: input.dataset.thickness ? parseFloat(input.dataset.thickness) : null,
+    width_mm: input.dataset.width ? parseFloat(input.dataset.width) : null,
+    ship_to: input.dataset.shipto || '',
+    stock_mt: input.value === '' ? null : parseFloat(input.value),
+  };
+  input.disabled = true;
+  try {
+    const res = await fetch('/api/consignment-stock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('save failed');
+    input.style.borderColor = '#3b6d11';
+    setTimeout(() => { input.style.borderColor = '#9bd4c8'; }, 800);
+  } catch (e) {
+    input.style.borderColor = '#e24b4a';
+  } finally {
+    input.disabled = false;
+  }
+}
+
+/* ── Order Request: submit an additional-order request for this N-code, and show its
+   own request history. Reviewed on the central /order-requests page (no login system,
+   so anyone can submit or review — see app/routers/orders.py). ── */
+async function loadOrderRequestPanel(d, additionalNeeded) {
+  const panel = document.getElementById('orderReqPanel');
+  if (!panel) return;
+  let history = [];
+  try {
+    const res = await fetch(`/api/order-requests?n_code=${encodeURIComponent(d.code)}`);
+    history = (await res.json()).requests || [];
+  } catch (e) { /* fall through with empty history */ }
+
+  const statusBadge = (s) => {
+    const map = { pending:'#eda100', approved:'#639922', sent:'#185fa5', rejected:'#e24b4a' };
+    return `<span class="badge" style="background:${map[s]||'#898781'}22;color:${map[s]||'#898781'}">${s.toUpperCase()}</span>`;
+  };
+  const historyHtml = history.length ? `
+    <table class="layer-table" style="margin-top:10px">
+      <thead><tr><th>Requested</th><th>N-code</th><th>By</th><th style="text-align:right">MT</th><th>Status</th><th>Reviewed By</th></tr></thead>
+      <tbody>
+        ${history.map(r => `<tr>
+          <td style="font-size:11px;color:#898781">${(r.requested_at||'').slice(0,16)}</td>
+          <td style="font-family:'SF Mono',monospace;font-size:12px">${r.covers_n_code || `<span style="color:#898781">${r.n_code} (group)</span>`}</td>
+          <td>${r.requested_by||'—'}</td>
+          <td class="num">${fmtN(r.requested_mt)}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td>${r.reviewed_by||'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '';
+
+  panel.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;color:#52514e;margin-bottom:4px">Request additional order (MT)</div>
+        <input type="number" id="orderReqMt" step="0.001" value="${additionalNeeded > 0 ? additionalNeeded.toFixed(3) : ''}"
+          style="width:140px;font-size:13px;padding:6px 10px;border:0.5px solid rgba(11,11,11,0.15);border-radius:8px;font-family:'SF Mono',monospace">
+      </div>
+      <div>
+        <div style="font-size:11px;color:#52514e;margin-bottom:4px">Your name</div>
+        <input type="text" id="orderReqBy" placeholder="Name"
+          style="width:140px;font-size:13px;padding:6px 10px;border:0.5px solid rgba(11,11,11,0.15);border-radius:8px">
+      </div>
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:11px;color:#52514e;margin-bottom:4px">Note (optional)</div>
+        <input type="text" id="orderReqNote" placeholder="e.g. new customer order this week"
+          style="width:100%;font-size:13px;padding:6px 10px;border:0.5px solid rgba(11,11,11,0.15);border-radius:8px">
+      </div>
+      <button style="font-size:12px;padding:7px 16px;border:none;border-radius:8px;background:#185fa5;color:#fff"
+        onclick="submitOrderRequest('${d.code}', '${CATEGORY}', '${(d.grade||'').replace(/'/g,"\\'")}')">Submit Request</button>
+    </div>
+    <div id="orderReqMsg" style="font-size:11px;margin-top:6px"></div>
+    ${historyHtml}`;
+}
+
+async function submitOrderRequest(ncode, category, grade) {
+  const mtInput = document.getElementById('orderReqMt');
+  const byInput = document.getElementById('orderReqBy');
+  const noteInput = document.getElementById('orderReqNote');
+  const msg = document.getElementById('orderReqMsg');
+  const requested_mt = parseFloat(mtInput.value);
+  const requested_by = byInput.value.trim();
+
+  if (!requested_mt || requested_mt <= 0) {
+    msg.textContent = 'Enter an order quantity greater than 0.';
+    msg.style.color = '#e24b4a';
+    return;
+  }
+  if (!requested_by) {
+    msg.textContent = 'Enter your name.';
+    msg.style.color = '#e24b4a';
+    return;
+  }
+  try {
+    const res = await fetch('/api/order-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, n_code: ncode, grade, requested_mt, requested_by, note: noteInput.value.trim() }),
+    });
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'failed');
+    msg.textContent = 'Request submitted.';
+    msg.style.color = '#3b6d11';
+    const d = NCODES[selectedIdx];
+    const q4tot = d.q4.reduce((a,b)=>a+b,0);
+    const additionalNeeded = Math.max(q4tot - (d.current.ordered_mt||0), 0);
+    loadOrderRequestPanel(d, additionalNeeded);
+  } catch (e) {
+    msg.textContent = 'Failed to submit: ' + e.message;
+    msg.style.color = '#e24b4a';
+  }
+}
+
+/* ── Individual N-code requests: below the group-level request, list every actual
+   covers_n_code (customer/spec line) inside this Group N-code so a request can be
+   placed against one of them specifically. There's no per-covers_n_code Q4 forecast
+   (booked/FCST/stat are only tracked at the group n_code level — see
+   api_v2_ncode_items), so these inputs start empty rather than auto-filled. ── */
+async function loadIndividualReqPanel(d) {
+  const panel = document.getElementById('individualReqPanel');
+  if (!panel) return;
+  let items = [];
+  try {
+    const res = await fetch(`/api/v2/ncode-items/${CATEGORY}/${encodeURIComponent(d.code)}`);
+    items = (await res.json()).items || [];
+  } catch (e) { /* fall through with empty items */ }
+
+  if (!items.length) {
+    panel.innerHTML = '<div style="color:#898781;font-size:12px">No individual N-code rows found for this group.</div>';
+    return;
+  }
+
+  panel.innerHTML = `
+    <table class="layer-table">
+      <thead><tr>
+        <th>Covers N-code</th><th>Ship-to</th>
+        <th style="text-align:right">Thickness</th><th style="text-align:right">Width</th>
+        <th style="text-align:right">Order Balance (MT)</th>
+        <th style="text-align:right">Request (MT)</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${items.map((it, i) => `
+        <tr>
+          <td style="font-family:'SF Mono',monospace;font-size:12px">${it.covers_n_code || '—'}</td>
+          <td style="font-size:12px">${it.customer_ship_to || '—'}</td>
+          <td class="num">${it.thickness_mm ?? '—'}</td>
+          <td class="num">${it.width_mm ?? '—'}</td>
+          <td class="num">${fmtN(it.order_balance_mt)}</td>
+          <td>
+            <input type="number" step="0.001" id="indivReqMt${i}"
+              style="width:100px;font-size:12px;padding:4px 6px;border:0.5px solid rgba(11,11,11,0.15);border-radius:6px;font-family:'SF Mono',monospace;text-align:right">
+          </td>
+          <td>
+            <button style="font-size:11px;padding:4px 10px;border:none;border-radius:6px;background:#185fa5;color:#fff"
+              onclick="submitIndividualOrderRequest(${i}, '${d.code}', '${(it.covers_n_code||'').replace(/'/g,"\\'")}', '${CATEGORY}', '${(d.grade||'').replace(/'/g,"\\'")}')">Request</button>
+          </td>
+        </tr>
+        <tr id="indivReqMsgRow${i}" style="display:none"><td colspan="7" style="font-size:11px;padding:0 12px 6px"></td></tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function submitIndividualOrderRequest(i, ncode, coversNcode, category, grade) {
+  const mtInput = document.getElementById(`indivReqMt${i}`);
+  const msgRow = document.getElementById(`indivReqMsgRow${i}`);
+  const msgCell = msgRow.querySelector('td');
+  const byInput = document.getElementById('orderReqBy'); // shared name field from the group request section above
+  const requested_mt = parseFloat(mtInput.value);
+  const requested_by = byInput ? byInput.value.trim() : '';
+
+  msgRow.style.display = '';
+  if (!requested_mt || requested_mt <= 0) {
+    msgCell.textContent = 'Enter an order quantity greater than 0.';
+    msgCell.style.color = '#e24b4a';
+    return;
+  }
+  if (!requested_by) {
+    msgCell.textContent = 'Enter your name in the "Your name" field above first.';
+    msgCell.style.color = '#e24b4a';
+    return;
+  }
+  try {
+    const res = await fetch('/api/order-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, n_code: ncode, covers_n_code: coversNcode, grade, requested_mt, requested_by }),
+    });
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'failed');
+    msgCell.textContent = 'Request submitted.';
+    msgCell.style.color = '#3b6d11';
+    mtInput.value = '';
+    const d = NCODES[selectedIdx];
+    const q4tot = d.q4.reduce((a,b)=>a+b,0);
+    const additionalNeeded = Math.max(q4tot - (d.current.ordered_mt||0), 0);
+    loadOrderRequestPanel(d, additionalNeeded); // refresh the shared history table too
+  } catch (e) {
+    msgCell.textContent = 'Failed to submit: ' + e.message;
+    msgCell.style.color = '#e24b4a';
+  }
+}
+
+/* ── layer table (① booked ② Customer FCST ③ stat fill-in → final, actual monthly data) ── */
+function layerSection(d) {
+  const sumL = arr => arr.reduce((a,b)=>a+b,0);
+  return `<div class="section">
+    <div class="section-title">26Q4 Forecast — Monthly Layers</div>
+    <table class="layer-table">
+      <thead><tr><th>Layer</th><th style="text-align:right">OCT</th><th style="text-align:right">NOV</th><th style="text-align:right">DEC</th><th style="text-align:right">Q4 Total</th></tr></thead>
+      <tbody>
+        <tr><td><span class="lyr-icon lyr1">①</span>Booked (15/104)</td>
+          ${d.layers.booked.map(v=>`<td class="num ${v?'pos':'zero'}">${fmt(v)}</td>`).join('')}
+          <td class="num pos">${fmtN(sumL(d.layers.booked))}</td></tr>
+        <tr><td><span class="lyr-icon lyr2">②</span>Customer FCST</td>
+          ${d.layers.cust_fcst.map(v=>`<td class="num ${v?'pos':'zero'}">${fmt(v)}</td>`).join('')}
+          <td class="num pos">${fmtN(sumL(d.layers.cust_fcst))}</td></tr>
+        <tr><td><span class="lyr-icon lyr3">③</span>Stat Fill (${d.model})</td>
+          ${d.layers.stat.map(v=>`<td class="num ${v?'pos':'zero'}">${fmt(v)}</td>`).join('')}
+          <td class="num pos">${fmtN(sumL(d.layers.stat))}</td></tr>
+        ${d.override_mt != null ? `<tr><td style="color:#898781">Model Forecast (before override)</td>
+          <td class="num zero">—</td><td class="num zero">—</td><td class="num zero">—</td>
+          <td class="num zero">${fmtN(d.computed_q4_mt)}</td></tr>` : ''}
+        <tr style="font-weight:500"><td>Final Forecast${d.override_mt != null ? ' <span style="font-weight:400;color:#854f0b">✎ override</span>' : ''}</td>
+          ${d.q4.map(v=>`<td class="num">${fmtN(v)}</td>`).join('')}
+          <td class="num" style="color:#185fa5">${fmtN(sumL(d.q4))}</td></tr>
+        <tr><td style="color:#898781">SPLY (reference baseline)</td>
+          <td class="num zero">—</td><td class="num zero">—</td><td class="num zero">—</td><td class="num zero">—</td></tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* ── shared chart HTML ── */
+function chartSection(d) {
+  return `<div class="chart-wrap">
+    <div class="chart-box">
+      <div class="chart-controls">
+        <span class="label">Demand Trend & Forecast</span>
+        <span class="chart-btn active" onclick="setRange(6,this)">Last 6 months</span>
+        <span class="chart-btn" onclick="setRange(3,this)">Last 3 months</span>
+      </div>
+      <div class="legend">
+        <span class="leg-item clickable" onclick="toggleDataset(0,this)" title="Click to show/hide"><span class="leg-dash" style="background:#73726c"></span>Actual</span>
+        <span class="leg-item clickable" onclick="toggleDataset(1,this)" title="Click to show/hide"><span class="leg-dash" style="background:#2a78d6"></span>26Q4 Forecast</span>
+        <span class="leg-item clickable" onclick="toggleDataset(2,this)" title="Click to show/hide"><span class="leg-dash" style="background:#0d9488;border-top:2px dashed #0d9488;height:0"></span>Ordered (James Prep, 3-mo total ÷3)</span>
+        <span class="leg-item clickable" onclick="toggleDataset(3,this)" title="Click to show/hide"><span class="leg-dash" style="background:#b45309;border-top:2px dashed #b45309;height:0"></span>SPLY (no data)</span>
+      </div>
+      <div style="position:relative;width:100%;height:220px">
+        <canvas id="mainChart" role="img" aria-label="${d.code} demand trend and forecast chart"></canvas>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── Chart.js rendering ── */
+function drawChart(d, range) {
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  const histLen = HIST_MONTHS.length;
+  const from = Math.max(0, histLen - range);
+  const histSlice  = d.hist.slice(from);
+  const histLabels = HIST_MONTHS.slice(from);
+  const allLabels  = [...histLabels, ...Q4_LABELS.map(m => '26-' + m)];
+
+  const histData     = [...histSlice, ...Array(3).fill(null)];
+  const forecastData = [...Array(histSlice.length - 1).fill(null), histSlice[histSlice.length-1], ...d.q4];
+  const splyData     = Array(allLabels.length).fill(null); // always null — no 2025 actuals
+  // Ordered (James Prep) is a single pre-order covering all of Oct+Nov+Dec together, not
+  // a separate order per month — so it's spread evenly (÷3) across the 3 Q4 points rather
+  // than repeating the full total at each one (which would read as 3x the real amount).
+  // Summed back across the 3 points this still equals the true total (see Additional
+  // Order Needed = Q4 Total − Ordered).
+  const orderedMt   = d.current.ordered_mt || 0;
+  const orderedMonthly = orderedMt / 3;
+  const orderedData = [...Array(histSlice.length).fill(null), orderedMonthly, orderedMonthly, orderedMonthly];
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: { labels: allLabels, datasets: [
+      { label:'Actual',    data: histData,     borderColor:'#73726c', borderWidth:2, pointRadius:3, pointBackgroundColor:'#73726c', tension:0.2, spanGaps:false },
+      { label:'26Q4 Forecast', data: forecastData, borderColor:'#2a78d6', borderWidth:2, pointRadius:4, pointBackgroundColor:'#2a78d6', tension:0.2,
+        fill: { target:'origin', above:'rgba(42,120,214,0.06)' } },
+      { label:'Ordered (÷3)', data: orderedData, borderColor:'#0d9488', borderWidth:1.5, pointRadius:0, borderDash:[4,3], tension:0 },
+      { label:'SPLY',    data: splyData,     borderColor:'#b45309', borderWidth:1.5, pointRadius:3, pointBackgroundColor:'#b45309', tension:0.2, borderDash:[5,4] }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode:'index', intersect:false } },
+      scales: {
+        x: { grid:{ display:false }, ticks:{ font:{size:11}, color:'#898781', maxRotation:45, autoSkip:false }},
+        y: { grid:{ color:'#e1e0d9' }, ticks:{ font:{size:11}, color:'#898781' }}
+      }
+    }
+  });
+}
+
+function setRange(n, el) {
+  document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentChartRange = n;
+  drawChart(NCODES[selectedIdx], n);
+}
+
+function toggleDataset(i, el) {
+  if (!chartInst || i >= chartInst.data.datasets.length) return;
+  const visible = chartInst.isDatasetVisible(i);
+  chartInst.setDatasetVisibility(i, !visible);
+  el.classList.toggle('off', visible);
+  chartInst.update();
+}
+
+/* Re-fetch N-codes AND the grade summary (an override changes grade-level Q4 rollups
+   too), re-select the current N-code, and rebuild the Forecast panel. Heavier than
+   refreshForecastData but the whole panel (KPIs, layer table, order-request prefill,
+   override row state) depends on the override. */
+async function reloadForecastAll() {
+  const currentCode = NCODES[selectedIdx] ? NCODES[selectedIdx].code : null;
+  const [ncodeRes, gradeRes] = await Promise.all([
+    fetch(`/api/v2/ncodes/${CATEGORY}`),
+    fetch(`/api/v2/grade-summary/${CATEGORY}`),
+  ]);
+  const ncodeData = await ncodeRes.json();
+  GRADE_SUMMARY = await gradeRes.json();
+  NCODES = ncodeData.ncodes;
+  const idx = NCODES.findIndex(n => n.code === currentCode);
+  if (idx >= 0) selectedIdx = idx;
+  buildSidebar();
+  renderForecastDetail();
+}
+
+async function applyOverride() {
+  const d = NCODES[selectedIdx];
+  const raw = document.getElementById('overrideInput').value;
+  const msg = document.getElementById('overrideMsg');
+  let override_mt = null;
+  if (raw !== '') {
+    override_mt = parseFloat(raw);
+    if (isNaN(override_mt) || override_mt < 0) {
+      msg.textContent = 'Enter a number of 0 or greater.';
+      msg.style.color = '#e24b4a';
+      return;
+    }
+  }
+  try {
+    const res = await fetch('/api/forecast-override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: CATEGORY, ncode: d.code, override_mt }),
+    });
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'failed');
+    await reloadForecastAll();
+  } catch (e) {
+    msg.textContent = 'Save failed: ' + e.message;
+    msg.style.color = '#e24b4a';
+  }
+}
+
+function clearOverride() {
+  document.getElementById('overrideInput').value = '';
+  applyOverride();
+}
+
+/* ── Grade Summary tab ── */
+let gradeSortKey = null, gradeSortDir = -1;
+
+function gradeSort(key) {
+  if (gradeSortKey === key) gradeSortDir *= -1;
+  else { gradeSortKey = key; gradeSortDir = -1; }
+  renderGradeTab();
+}
+
+function renderGradeTab() {
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  const gs = GRADE_SUMMARY;
+  if (!gs || !gs.rows.length) {
+    document.getElementById('detailPanel').innerHTML = '<div class="empty-state">No grade data.</div>';
+    return;
+  }
+  // Ordered (James Prep) rolled up per grade from the N-code list, so the table and
+  // chart can show forecast vs. what's already ordered side by side
+  const orderedByGrade = {};
+  NCODES.forEach(n => {
+    const g = n.grade || 'Unknown';
+    orderedByGrade[g] = (orderedByGrade[g] || 0) + (n.current.ordered_mt || 0);
+  });
+  let rows = gs.rows.map(r => {
+    const ordered_mt = orderedByGrade[r.grade] || 0;
+    return { ...r, ordered_mt, need_order_mt: Math.max(r.q4_total_mt - ordered_mt, 0) };
+  });
+  if (gradeSortKey) {
+    rows = [...rows].sort((a, b) => {
+      const va = a[gradeSortKey], vb = b[gradeSortKey];
+      if (typeof va === 'string') return va.localeCompare(vb) * gradeSortDir;
+      return ((va ?? -Infinity) - (vb ?? -Infinity)) * gradeSortDir;
+    });
+  }
+  const totOct = rows.reduce((s,r)=>s+r.oct_mt,0);
+  const totNov = rows.reduce((s,r)=>s+r.nov_mt,0);
+  const totDec = rows.reduce((s,r)=>s+r.dec_mt,0);
+  const totOrdered = rows.reduce((s,r)=>s+r.ordered_mt,0);
+  const totNeedOrder = rows.reduce((s,r)=>s+r.need_order_mt,0);
+  const arrow = k => gradeSortKey === k ? (gradeSortDir < 0 ? ' ↓' : ' ↑') : '';
+  const th = (k, label, first) => `<th class="sortable"${first?' style="text-align:left"':''} onclick="gradeSort('${k}')" title="Click to sort">${label}${arrow(k)}</th>`;
+
+  const dots = cc => {
+    const total = cc.HIGH + cc.MID + cc.LOW;
+    if (total > 12) {
+      // too many to show as individual dots without overflowing the cell — show counts instead
+      return `<span class="conf-count">${cc.HIGH?`<span style="color:#639922">●${cc.HIGH}</span> `:''}${cc.MID?`<span style="color:#eda100">●${cc.MID}</span> `:''}${cc.LOW?`<span style="color:#e24b4a">●${cc.LOW}</span>`:''}</span>`;
+    }
+    return Array(cc.HIGH).fill('<span class="conf-dot" style="background:#639922"></span>').join('') +
+      Array(cc.MID).fill('<span class="conf-dot" style="background:#eda100"></span>').join('') +
+      Array(cc.LOW).fill('<span class="conf-dot" style="background:#e24b4a"></span>').join('');
+  };
+
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="detail-header">
+      <div class="dh-top">
+        <span class="dh-code">Grade Summary</span>
+        <span class="dh-name">${CATEGORY} — 26Q4 (OCT / NOV / DEC) Demand Forecast</span>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Q4 Total Forecast</div><div class="kpi-val accent">${fmtN(gs.total_q4_mt)} MT</div></div>
+      <div class="kpi"><div class="kpi-label">Ordered (James Prep)</div><div class="kpi-val" style="color:#0d9488">${fmtN(totOrdered)} MT</div></div>
+      <div class="kpi"><div class="kpi-label">Additional Order Needed</div><div class="kpi-val ${totNeedOrder>0?'warn':'success'}">${fmtN(totNeedOrder)} MT</div></div>
+      <div class="kpi"><div class="kpi-label">HIGH / LOW Confidence</div><div class="kpi-val"><span class="success">${gs.confidence_totals.HIGH}</span> <span style="font-size:13px;color:#898781">/</span> <span class="warn">${gs.confidence_totals.LOW}</span></div></div>
+    </div>
+    <div class="grade-summary-wrap">
+      <div class="section-title" style="padding-top:0;margin-bottom:12px">26Q4 Forecast by Grade
+        <span style="font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px;color:#898781">click a column to sort · click a row to drill into its N-codes</span>
+      </div>
+      <table class="grade-table">
+        <thead><tr>
+          ${th('grade','Grade',true)}${th('ncode_count','N-code')}${th('target_mt','Target')}
+          ${th('consignment_mt','Consign<br>Stock')}${th('net_need_mt','Net Need')}
+          ${th('oct_mt','OCT')}${th('nov_mt','NOV')}${th('dec_mt','DEC')}
+          ${th('q4_total_mt','Q4 Total')}${th('ordered_mt','Ordered')}${th('need_order_mt','Need<br>Order')}<th>Confidence</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr class="clickable" onclick="drillToGrade('${r.grade.replace(/'/g,"\\'")}')" title="Show ${r.grade} N-codes">
+            <td>${r.grade}</td><td>${r.ncode_count}</td><td>${fmtN(r.target_mt)}</td>
+            <td style="color:#185fa5">${fmtN(r.consignment_mt)}</td>
+            <td style="font-weight:500;color:#e24b4a">${fmtN(r.net_need_mt)}</td>
+            <td>${fmtN(r.oct_mt)}</td><td>${fmtN(r.nov_mt)}</td><td>${fmtN(r.dec_mt)}</td>
+            <td style="font-weight:500;color:#185fa5">${fmtN(r.q4_total_mt)}</td>
+            <td style="color:#0d9488">${fmtN(r.ordered_mt)}</td>
+            <td style="font-weight:500;color:${r.need_order_mt>0?'#a32d2d':'#3b6d11'}">${r.need_order_mt>0?fmtN(r.need_order_mt):'✓'}</td>
+            <td><div class="conf-bar">${dots(r.confidence_counts)}</div></td>
+          </tr>`).join('')}
+          <tr class="total">
+            <td>Total</td><td>${gs.total_ncodes}</td><td>${fmtN(rows.reduce((s,r)=>s+r.target_mt,0))}</td>
+            <td style="color:#185fa5">${fmtN(gs.total_consignment_mt)}</td>
+            <td style="color:#e24b4a">${fmtN(rows.reduce((s,r)=>s+(r.net_need_mt||0),0))}</td>
+            <td>${fmtN(totOct)}</td><td>${fmtN(totNov)}</td><td>${fmtN(totDec)}</td>
+            <td style="color:#185fa5">${fmtN(gs.total_q4_mt)}</td>
+            <td style="color:#0d9488">${fmtN(totOrdered)}</td>
+            <td style="color:#a32d2d">${fmtN(totNeedOrder)}</td><td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-box">
+        <div class="chart-controls"><span class="label">26Q4 Forecast vs Ordered by Grade</span>
+          <span style="font-size:11px;color:#898781">click a bar to drill down</span></div>
+        <div class="legend">
+          <span class="leg-item clickable" onclick="toggleDataset(0,this)" title="Click to show/hide"><span class="leg-dash" style="background:#2a78d6"></span>Q4 Forecast</span>
+          <span class="leg-item clickable" onclick="toggleDataset(1,this)" title="Click to show/hide"><span class="leg-dash" style="background:#0d9488"></span>Ordered</span>
+        </div>
+        <div style="position:relative;width:100%;height:220px">
+          <canvas id="gradeChart" role="img" aria-label="26Q4 forecast vs ordered by grade bar chart"></canvas>
+        </div>
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    const ctx = document.getElementById('gradeChart');
+    if (!ctx) return;
+    chartInst = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.grade),
+        datasets: [
+          { label:'Q4 Forecast', data:rows.map(r=>r.q4_total_mt), backgroundColor:'#2a78d6', borderRadius:4, barPercentage:0.8 },
+          { label:'Ordered',     data:rows.map(r=>r.ordered_mt),  backgroundColor:'#0d9488', borderRadius:4, barPercentage:0.8 },
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        onClick: (evt, els) => { if (els.length) drillToGrade(chartInst.data.labels[els[0].index]); },
+        onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        plugins:{ legend:{ display:false }, tooltip:{ mode:'index', intersect:false } },
+        scales:{
+          x:{ grid:{display:false}, ticks:{font:{size:12},color:'#898781'} },
+          y:{ grid:{color:'#e1e0d9'}, ticks:{font:{size:11},color:'#898781'} }
+        }
+      }
+    });
+  }, 50);
+}
+
+/* Grade Summary row/bar click → Forecast tab, sidebar pre-filtered to that grade */
+function drillToGrade(g) {
+  filterGrade = g;
+  const order = NCODES.map((_, i) => i).sort((x, y) => SORTS[sortMode](NCODES[x], NCODES[y]));
+  const first = order.find(i => (NCODES[i].grade || '') === g);
+  if (first !== undefined) selectedIdx = first;
+  currentTab = 1;
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === 1));
+  document.getElementById('sidebar').style.display = '';
+  buildFilterChips();
+  buildSidebar();
+  renderDetail();
+}
+
+/* ── Order Priority tab: every N-code ranked by how urgently it needs an additional
+   production order (26Q4 Final Forecast − already Ordered). Click a row to jump to
+   that N-code's Forecast view and submit the order request there. ── */
+let prioSortKey = 'need', prioSortDir = -1, prioGrade = 'ALL', prioShowCovered = false;
+
+function prioSort(key) {
+  if (prioSortKey === key) prioSortDir *= -1;
+  else { prioSortKey = key; prioSortDir = -1; }
+  renderPriorityTab();
+}
+
+function renderPriorityTab() {
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  if (!NCODES.length) {
+    document.getElementById('detailPanel').innerHTML = '<div class="empty-state">No N-code data.</div>';
+    return;
+  }
+  let rows = NCODES.map(n => ({
+    code: n.code, grade: n.grade || '—', customer: n.customer, conf: n.confidence,
+    override: n.override_mt != null,
+    q4: q4Total(n), ordered: n.current.ordered_mt || 0, need: addNeeded(n), cov: covPct(n),
+    dq: n.delta ? n.delta.q4_mt : null,
+  }));
+  const hasDelta = rows.some(r => r.dq != null);
+  const totNeed = rows.reduce((s,r)=>s+r.need,0);
+  const needingCnt = rows.filter(r=>r.need>0).length;
+  const coveredCnt = rows.length - needingCnt;
+  const totQ4 = rows.reduce((s,r)=>s+r.q4,0);
+  const totOrdered = rows.reduce((s,r)=>s+r.ordered,0);
+  const overallCov = totQ4 > 0 ? Math.round(Math.min(totOrdered/totQ4*100,100)) : 100;
+
+  if (prioGrade !== 'ALL') rows = rows.filter(r => r.grade === prioGrade);
+  if (!prioShowCovered) rows = rows.filter(r => r.need > 0);
+  rows.sort((a, b) => {
+    const va = a[prioSortKey] ?? 0, vb = b[prioSortKey] ?? 0;
+    if (typeof va === 'string') return va.localeCompare(vb) * prioSortDir;
+    return (va - vb) * prioSortDir;
+  });
+  const maxNeed = Math.max(...rows.map(r=>r.need), 1);
+
+  const arrow = k => prioSortKey === k ? (prioSortDir < 0 ? ' ↓' : ' ↑') : '';
+  const th = (k, label, first) => `<th class="sortable"${first?' style="text-align:left"':''} onclick="prioSort('${k}')" title="Click to sort">${label}${arrow(k)}</th>`;
+  const gradeOpts = ['ALL', ...GRADES].map(g =>
+    `<option value="${g}"${g===prioGrade?' selected':''}>${g==='ALL'?'All grades':g}</option>`).join('');
+
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="detail-header">
+      <div class="dh-top">
+        <span class="dh-code">Order Priority</span>
+        <span class="dh-name">${CATEGORY} — N-codes ranked by additional production order needed (26Q4 forecast − ordered)</span>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Total Additional Order Needed</div><div class="kpi-val ${totNeed>0?'warn':'success'}">${fmtN(totNeed)} MT</div></div>
+      <div class="kpi"><div class="kpi-label">N-codes Needing Orders</div><div class="kpi-val ${needingCnt>0?'warn':'success'}">${needingCnt}</div></div>
+      <div class="kpi"><div class="kpi-label">Fully Covered N-codes</div><div class="kpi-val success">${coveredCnt}</div></div>
+      <div class="kpi"><div class="kpi-label">Overall Order Coverage</div><div class="kpi-val ${overallCov>=100?'success':overallCov>=70?'':'warn'}">${overallCov}%</div>
+        <div class="cov-track" style="margin-top:6px"><div class="cov-fill" style="width:${overallCov}%;background:${covColor(overallCov)}"></div></div></div>
+    </div>
+    <div class="grade-summary-wrap">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <select onchange="prioGrade=this.value;renderPriorityTab()" style="font-size:12px;padding:5px 8px;border:0.5px solid rgba(11,11,11,0.1);border-radius:8px;background:#fff;color:#52514e;cursor:pointer">${gradeOpts}</select>
+        <span class="chip${prioShowCovered?' active':''}" onclick="prioShowCovered=!prioShowCovered;renderPriorityTab()">Show covered N-codes</span>
+        <span style="font-size:11px;color:#898781;margin-left:auto">${rows.length} N-codes shown · click a row to open its Forecast view</span>
+      </div>
+      <table class="grade-table">
+        <thead><tr>
+          <th style="text-align:left">#</th>${th('code','N-code',true)}${th('grade','Grade',true)}<th style="text-align:left">Customer</th>
+          <th>Conf.</th>${th('q4','Q4 Forecast')}${hasDelta ? th('dq','Δ Fcst wk') : ''}${th('ordered','Ordered')}${th('cov','Coverage')}${th('need','Additional Needed')}
+        </tr></thead>
+        <tbody>
+          ${rows.map((r, i) => `<tr class="clickable" onclick="jumpToNcode('${r.code}')" title="Open ${r.code} Forecast view">
+            <td style="color:#898781;font-family:inherit">${i+1}</td>
+            <td style="text-align:left;font-weight:500">${r.code}${r.override?' <span class="badge" style="background:#faeeda;color:#854f0b">OVR</span>':''}</td>
+            <td style="text-align:left;font-family:inherit">${r.grade}</td>
+            <td style="text-align:left;font-family:inherit;font-weight:400;font-size:12px;color:#52514e;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.customer}</td>
+            <td style="font-family:inherit"><span class="${confClass(r.conf)}">${confLabel(r.conf)}</span></td>
+            <td>${fmtN(r.q4)}</td>
+            ${hasDelta ? `<td style="color:${r.dq > 0 ? '#3b6d11' : r.dq < 0 ? '#a32d2d' : '#898781'}">${r.dq != null && Math.abs(r.dq) >= 0.005 ? (r.dq>0?'▲':'▼') + fmtN(Math.abs(r.dq)) : '—'}</td>` : ''}
+            <td style="color:#0d9488">${fmtN(r.ordered)}</td>
+            <td><div class="prio-cell"><div class="cov-track" style="width:60px;margin-top:0"><div class="cov-fill" style="width:${r.cov}%;background:${covColor(r.cov)}"></div></div><span style="font-size:11px;color:#52514e;width:34px">${Math.round(r.cov)}%</span></div></td>
+            <td><div class="prio-cell"><div class="prio-track"><div class="prio-fill" style="width:${r.need/maxNeed*100}%"></div></div><span style="font-weight:500;color:${r.need>0?'#a32d2d':'#3b6d11'};min-width:64px">${r.need>0?fmtN(r.need):'✓'}</span></div></td>
+          </tr>`).join('')}
+          ${!rows.length ? '<tr><td colspan="10" style="text-align:center;color:#898781;padding:24px">Every N-code in this filter is fully covered.</td></tr>' : ''}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ── Customers tab: ship-to customer rollup of current status figures, with the
+   customer's own entered Q4 FCST. Expanding a row lists its group N-codes; clicking
+   one opens that N-code's Forecast view. The model forecast is not attributed per
+   customer (it only exists at group N-code level) — see api_v2_customer_summary. ── */
+let custSortKey = 'ordered_mt', custSortDir = -1, custExpanded = null;
+
+function custSort(key) {
+  if (custSortKey === key) custSortDir *= -1;
+  else { custSortKey = key; custSortDir = -1; }
+  renderCustomerTab();
+}
+
+function toggleCustomer(name) {
+  custExpanded = custExpanded === name ? null : name;
+  renderCustomerTab();
+}
+
+function filterCustomerRows() {
+  const q = (document.getElementById('custSearch')?.value || '').toLowerCase();
+  document.querySelectorAll('#custTable tbody tr[data-customer]').forEach(r => {
+    const hit = r.dataset.customer.toLowerCase().includes(q);
+    r.style.display = hit ? '' : 'none';
+    const exp = document.getElementById('custExp-' + r.dataset.idx);
+    if (exp) exp.style.display = hit && custExpanded === r.dataset.customer ? '' : 'none';
+  });
+}
+
+async function renderCustomerTab() {
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  const panel = document.getElementById('detailPanel');
+  const prevSearch = (document.getElementById('custSearch')?.value || '').replace(/"/g, '&quot;');
+  if (!CUSTOMERS || CUSTOMERS.category !== CATEGORY) {
+    panel.innerHTML = '<div class="empty-state">Loading customer data...</div>';
+    try {
+      const res = await fetch(`/api/v2/customer-summary/${CATEGORY}`);
+      CUSTOMERS = await res.json();
+    } catch (e) {
+      panel.innerHTML = '<div class="empty-state">Failed to load customer data.</div>';
+      return;
+    }
+    if (currentTab !== 3) return; // user already moved on to another tab
+  }
+  const all = CUSTOMERS.customers || [];
+  if (!all.length) {
+    panel.innerHTML = '<div class="empty-state">No customer data. Please upload the main sheet.</div>';
+    return;
+  }
+  const totOrdered = all.reduce((s,c)=>s+c.ordered_mt,0);
+  const totBalance = all.reduce((s,c)=>s+c.order_balance_mt,0);
+  const totProduced = all.reduce((s,c)=>s+c.produced_mt,0);
+  const top = all.reduce((m,c)=>c.ordered_mt>m.ordered_mt?c:m, all[0]);
+  const topShare = totOrdered > 0 ? Math.round(top.ordered_mt/totOrdered*100) : 0;
+  const maxOrdered = Math.max(...all.map(c=>c.ordered_mt), 1);
+
+  const rows = [...all].sort((a, b) => {
+    const va = a[custSortKey] ?? 0, vb = b[custSortKey] ?? 0;
+    if (typeof va === 'string') return va.localeCompare(vb) * custSortDir;
+    return (va - vb) * custSortDir;
+  });
+  const arrow = k => custSortKey === k ? (custSortDir < 0 ? ' ↓' : ' ↑') : '';
+  const th = (k, label, first) => `<th class="sortable"${first?' style="text-align:left"':''} onclick="custSort('${k}')" title="Click to sort">${label}${arrow(k)}</th>`;
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div class="dh-top">
+        <span class="dh-code">Customers</span>
+        <span class="dh-name">${CATEGORY} — ship-to customer rollup (current status + entered Q4 FCST)</span>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Customers</div><div class="kpi-val">${all.length}</div></div>
+      <div class="kpi"><div class="kpi-label">Total Ordered</div><div class="kpi-val" style="color:#0d9488">${fmtN(totOrdered)} MT</div></div>
+      <div class="kpi"><div class="kpi-label">Total Order Balance</div><div class="kpi-val ${totBalance<0?'warn':''}">${fmtN(totBalance)} MT</div></div>
+      <div class="kpi"><div class="kpi-label">Largest Customer</div><div class="kpi-val" style="font-size:14px">${top.customer}</div><div class="kpi-delta">${topShare}% of ordered volume</div></div>
+    </div>
+    <div class="grade-summary-wrap">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <input type="text" id="custSearch" placeholder="Search customer..." value="${prevSearch}" oninput="filterCustomerRows()"
+          style="font-size:12px;padding:6px 10px;border:0.5px solid rgba(11,11,11,0.1);border-radius:8px;background:#fff;outline:none;width:220px">
+        <span style="font-size:11px;color:#898781;margin-left:auto">click a row to list its N-codes</span>
+      </div>
+      <table class="grade-table" id="custTable">
+        <thead><tr>
+          ${th('customer','Customer',true)}${th('ncode_count','N-codes')}
+          ${th('ordered_mt','Ordered')}<th></th>${th('order_balance_mt','Order<br>Balance')}
+          ${th('produced_mt','Produced')}${th('production_balance_mt','Production<br>Balance')}${th('q4_fcst_mt','Q4 FCST<br>(entered)')}
+        </tr></thead>
+        <tbody>
+          ${rows.map((c, i) => `
+          <tr class="clickable" data-customer="${c.customer.replace(/"/g,'&quot;')}" data-idx="${i}" onclick="toggleCustomer('${c.customer.replace(/'/g,"\\'")}')" title="Show N-codes">
+            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.customer}</td>
+            <td>${c.ncode_count}</td>
+            <td style="color:#0d9488;font-weight:500">${fmtN(c.ordered_mt)}</td>
+            <td style="width:120px"><div class="prio-track"><div class="prio-fill" style="width:${c.ordered_mt/maxOrdered*100}%;background:#0d9488"></div></div></td>
+            <td style="color:${c.order_balance_mt<0?'#a32d2d':'inherit'}">${fmtN(c.order_balance_mt)}</td>
+            <td>${fmtN(c.produced_mt)}</td>
+            <td>${fmtN(c.production_balance_mt)}</td>
+            <td style="color:${c.q4_fcst_mt>0?'#7c5ac9':'#898781'}">${c.q4_fcst_mt>0?fmtN(c.q4_fcst_mt):'—'}</td>
+          </tr>
+          ${custExpanded === c.customer ? `
+          <tr id="custExp-${i}"><td colspan="8" style="text-align:left;background:#fcfcfb;padding:8px 12px">
+            <span style="font-size:11px;color:#898781;margin-right:6px">N-codes:</span>
+            ${c.ncodes.map(nc => `<span class="cust-ncode-chip" onclick="event.stopPropagation();jumpToNcode('${nc}')">${nc}</span>`).join('')}
+          </td></tr>` : ''}`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  filterCustomerRows();
+}
+
+/* ── initial run ── */
+loadData();
+</script>
+</body>
+</html>

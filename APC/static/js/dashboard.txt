@@ -1,0 +1,447 @@
+/* =============================================
+   APC Pre-Production Dashboard — JS Utilities
+   ============================================= */
+
+// Sidebar date
+(function() {
+  const el = document.getElementById('sidebarDate');
+  if (el) {
+    const d = new Date();
+    el.textContent = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+  }
+})();
+
+// Sidebar toggle
+function toggleSidebar() {
+  const s = document.getElementById('sidebar');
+  const w = document.querySelector('.main-wrapper');
+  if (window.innerWidth <= 900) {
+    s.classList.toggle('mobile-open');
+  } else {
+    s.classList.toggle('collapsed');
+    w.classList.toggle('expanded');
+  }
+}
+
+// Tab switching
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.dash-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// Toast
+function showToast(msg, type = 'info') {
+  let c = document.getElementById('toastContainer');
+  if (!c) { c = document.createElement('div'); c.id = 'toastContainer'; document.body.appendChild(c); }
+  const el = document.createElement('div');
+  el.className = `toast-item toast-${type}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3200);
+}
+
+// Progress bar color
+function progressColor(pct) {
+  if (pct === null || pct === undefined) return 'var(--primary)';
+  if (pct >= 100) return '#10b981';
+  if (pct >= 70)  return '#3f83f8';
+  if (pct >= 40)  return '#f59e0b';
+  return '#ef4444';
+}
+
+// ── Overview chart: single stacked bar (Produced + In Transit + In Production + Remaining = Target) ──
+function renderTotalChart(canvasId, catData) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  if (canvas._chart) canvas._chart.destroy();
+
+  const target      = catData.total_target       || 0;
+  // Produced and In Transit are the same underlying figure (sap_apc_orders.in_transit),
+  // so they're shown as one "Produced" segment instead of double-counting it.
+  // chart_produced_mt: 15APC In Transit, Surface 기준 전체 합계 (Standard = 2B,
+  // Precision = 그 외) — Achievement KPI와 동일한 값.
+  const produced    = (catData.chart_produced_mt ?? catData.total_produced) || 0;
+  const inProduction = catData.total_in_production || 0;
+  // Remaining = Target - Produced - In Production (floor to 0)
+  const remaining = Math.max(target - produced - inProduction, 0);
+
+  const label = catData.category === 'Standard' ? 'Standard (2B)' : 'Precision (Pre)';
+
+  // Value label plugin
+  const labelPlugin = {
+    id: 'stackLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const segments = [
+        { idx: 0, val: produced,     color: '#065f46', label: 'Produced' },
+        { idx: 1, val: inProduction, color: '#1e40af', label: 'In Production' },
+      ];
+      segments.forEach(({ idx, val, color, label: lbl }) => {
+        if (val <= 0) return;
+        const meta = chart.getDatasetMeta(idx);
+        const bar  = meta.data[0];
+        if (!bar) return;
+        const { x } = bar;
+        const { base, y } = bar.getProps(['base', 'y']);
+        const midY = (base + y) / 2;
+        ctx.save();
+        ctx.font = 'bold 11px Segoe UI, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // Only draw if segment is tall enough
+        if (Math.abs(base - y) > 18) {
+          ctx.fillText(`${val} MT`, x, midY);
+        }
+        ctx.restore();
+      });
+      // Draw target value at top of bar
+      const targetMeta = chart.getDatasetMeta(2);
+      if (targetMeta && targetMeta.data[0]) {
+        const bar = chart.getDatasetMeta(0).data[0];
+        if (bar) {
+          const allBase = chart.getDatasetMeta(0).data[0].getProps(['base'])['base'];
+          ctx.save();
+          ctx.font = 'bold 13px Segoe UI, sans-serif';
+          ctx.fillStyle = '#1e3a8a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`Target: ${target} MT`, bar.x, allBase - chart.chartArea.height - 2 + chart.chartArea.height + chart.chartArea.top - chart.chartArea.top);
+          ctx.restore();
+        }
+      }
+    },
+  };
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    plugins: [labelPlugin],
+    data: {
+      labels: [label],
+      datasets: [
+        {
+          label: 'Produced',
+          data: [produced],
+          backgroundColor: '#10b981',   // green
+          borderColor: '#059669',
+          borderWidth: 0,
+          borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
+          stack: 'total',
+        },
+        {
+          label: 'In Production',
+          data: [inProduction],
+          backgroundColor: '#60a5fa',   // blue
+          borderColor: '#2563eb',
+          borderWidth: 0,
+          stack: 'total',
+        },
+        {
+          label: 'Remaining',
+          data: [remaining],
+          backgroundColor: '#e2e8f0',   // light gray
+          borderColor: '#cbd5e1',
+          borderWidth: 0,
+          borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+          stack: 'total',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: () => label,
+            label: ctx => {
+              const val = ctx.parsed.y;
+              const pct = target > 0 ? ((val / target) * 100).toFixed(1) : 0;
+              return ` ${ctx.dataset.label}: ${val} MT (${pct}%)`;
+            },
+            footer: () => `Target: ${target} MT`,
+          },
+          backgroundColor: '#0f172a',
+          titleColor: '#f1f5f9',
+          bodyColor: '#e2e8f0',
+          footerColor: '#94a3b8',
+          padding: 12,
+          cornerRadius: 8,
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { size: 13, weight: '700' }, color: '#374151' },
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          max: target > 0 ? target * 1.05 : 100,
+          grid: { color: '#f1f5f9' },
+          ticks: { font: { size: 10 }, color: '#94a3b8' },
+          title: { display: true, text: 'MT', font: { size: 10 }, color: '#94a3b8' },
+        },
+      },
+    },
+  });
+}
+
+// ── Per-grade chart (kept for detail use if needed) ──
+async function renderOverviewChart(canvasId, category) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  let data;
+  try {
+    const res = await fetch(`/api/chart/${category}`);
+    data = await res.json();
+  } catch (e) { console.error('Chart fetch error', e); return; }
+
+  if (!data.chart_data || data.chart_data.length === 0) return;
+  if (canvas._chart) canvas._chart.destroy();
+
+  const grades     = data.chart_data.map(d => d.grade);
+  const targets    = data.chart_data.map(d => d.target);
+  const inTransits = data.chart_data.map(d => d.in_transit);
+
+  // Annotate bar with value label
+  const valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      chart.data.datasets.forEach((ds, dsIdx) => {
+        const meta = chart.getDatasetMeta(dsIdx);
+        meta.data.forEach((bar, i) => {
+          const val = ds.data[i];
+          if (val <= 0) return;
+          const { x, y } = bar.getCenterPoint();
+          ctx.save();
+          ctx.font = 'bold 10px Segoe UI, sans-serif';
+          ctx.fillStyle = '#374151';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(val, x, y - 2);
+          ctx.restore();
+        });
+      });
+    }
+  };
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: grades,
+      datasets: [
+        {
+          label: 'Target (MT)',
+          data: targets,
+          backgroundColor: '#bfdbfe',   // light blue
+          borderColor: '#3b82f6',
+          borderWidth: 1.5,
+          borderRadius: 4,
+        },
+        {
+          label: 'In Transit (MT)',
+          data: inTransits,
+          backgroundColor: '#fbbf24',   // amber
+          borderColor: '#d97706',
+          borderWidth: 1.5,
+          borderRadius: 4,
+        },
+      ],
+    },
+    plugins: [valueLabels],
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: false,  // custom legend in HTML above
+        },
+        tooltip: {
+          callbacks: {
+            title: ctx => ctx[0].label,
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} MT`,
+            afterBody: (items) => {
+              const idx     = items[0].dataIndex;
+              const tgt     = targets[idx] || 0;
+              const transit = inTransits[idx] || 0;
+              const pct     = tgt > 0 ? ((transit / tgt) * 100).toFixed(1) : 0;
+              return [`In Transit ratio: ${pct}%`];
+            },
+          },
+          backgroundColor: '#0f172a',
+          titleColor: '#f1f5f9',
+          bodyColor: '#e2e8f0',
+          padding: 10,
+          cornerRadius: 8,
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 11, weight: '600' }, color: '#374151' },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#f1f5f9' },
+          ticks: { font: { size: 10 }, color: '#94a3b8' },
+          title: { display: true, text: 'MT', font: { size: 10 }, color: '#94a3b8' },
+        },
+      },
+    },
+  });
+}
+
+// Summary bar chart: Target vs Produced vs OTX Plan
+function renderSummaryChart(canvasId, catData) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !catData?.rows?.length) return;
+  if (canvas._chart) { canvas._chart.destroy(); }
+
+  const grades   = catData.rows.map(r => r.grade);
+  const targets  = catData.rows.map(r => r.target_mt   || 0);
+  const produced = catData.rows.map(r => r.produced_mt  || 0);
+  const plan     = catData.rows.map(r => r.plan_sum_mt  || 0);
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: grades,
+      datasets: [
+        { label: 'Target (MT)',     data: targets,  backgroundColor: '#dbeafe', borderColor: '#3b82f6', borderWidth: 1.5 },
+        { label: 'OTX Plan (MT)',   data: plan,     backgroundColor: '#fde68a', borderColor: '#f59e0b', borderWidth: 1.5 },
+        { label: 'Produced (MT)',   data: produced, backgroundColor: '#6ee7b7', borderColor: '#10b981', borderWidth: 1.5 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, padding: 16 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} MT` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { beginAtZero: true, grid: { color: '#f1f5f9' },
+             ticks: { font: { size: 11 } },
+             title: { display: true, text: 'MT', font: { size: 10 }, color: '#94a3b8' } },
+      },
+    },
+  });
+}
+
+// Comment save
+async function saveComment() {
+  const textarea = document.getElementById('commentText');
+  if (!textarea) return;
+  const content  = textarea.value.trim();
+  const asOfDate = document.getElementById('asOfDateRef')?.dataset?.date
+                   || new Date().toISOString().slice(0, 10);
+  const res = await fetch('/api/comment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, as_of_date: asOfDate }),
+  });
+  const data = await res.json();
+  if (data.status === 'ok') showToast('Comment saved.', 'success');
+  else showToast('Failed to save comment.', 'error');
+}
+
+// Upload helpers
+async function uploadSap() {
+  const form = document.getElementById('sapForm');
+  const fd = new FormData(form);
+  const hasCombined = fd.get('file_combined')?.size > 0;
+  const has15 = fd.get('file_15')?.size > 0;
+  const has25 = fd.get('file_25')?.size > 0;
+  const has15apc = fd.get('file_15apc')?.size > 0;
+  const has104 = fd.get('file_104')?.size > 0;
+  if (!hasCombined && !has15 && !has25 && !has15apc && !has104) {
+    showToast('Please select at least one file.', 'warning'); return;
+  }
+  showUploadResult('sapResult', 'Processing...', 'info');
+  const res  = await fetch('/api/upload/sap',  { method: 'POST', body: fd });
+  renderUploadResult('sapResult', await res.json());
+}
+
+async function uploadCustomerForecast() {
+  const fileInput = document.getElementById('inp-forecast');
+  if (!fileInput.files.length) { showToast('Please select a file.', 'warning'); return; }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  showUploadResult('forecastResult', 'Processing...', 'info');
+  const res = await fetch('/api/upload/customer-forecast', { method: 'POST', body: fd });
+  renderUploadResult('forecastResult', await res.json());
+}
+
+async function uploadConsignmentStock() {
+  const fileInput = document.getElementById('inp-consignment');
+  if (!fileInput.files.length) { showToast('Please select a file.', 'warning'); return; }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  showUploadResult('consignmentResult', 'Processing...', 'info');
+  const res = await fetch('/api/upload/consignment-stock', { method: 'POST', body: fd });
+  renderUploadResult('consignmentResult', await res.json());
+}
+
+async function uploadMain() {
+  const form = document.getElementById('mainForm');
+  const fd = new FormData(form);
+  const has2b  = fd.get('file_2b')?.size  > 0;
+  const hasPre = fd.get('file_pre')?.size > 0;
+  if (!has2b && !hasPre) { showToast('Please select at least one file.', 'warning'); return; }
+  showUploadResult('mainResult', 'Processing...', 'info');
+  const res  = await fetch('/api/upload/main', { method: 'POST', body: fd });
+  renderUploadResult('mainResult', await res.json());
+}
+
+function renderUploadResult(elId, data) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (data.status === 'ok' || data.status === 'partial') {
+    const rows = data.results.map(r =>
+      `<div>✔ ${r.type || r.category}: <strong>${r.rows}</strong> rows loaded${r.as_of_date ? ' — as of ' + r.as_of_date : ''}</div>`
+    ).join('');
+    el.innerHTML = `<div class="result-box result-ok">${rows}</div>`;
+    if (data.errors?.length) {
+      const errs = data.errors.map(e => `<div>⚠ ${e.file || ''}: ${e.error}</div>`).join('');
+      el.innerHTML += `<div class="result-box result-warn mt-2">${errs}</div>`;
+    }
+    if (data.status === 'ok') setTimeout(() => location.reload(), 1800);
+  } else {
+    const errs = data.errors?.map(e => `<div>✖ ${e.error}</div>`).join('') || '<div>Unknown error</div>';
+    el.innerHTML = `<div class="result-box result-err">${errs}</div>`;
+  }
+}
+
+function showUploadResult(elId, msg, type) {
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = `<div class="result-box result-${type === 'info' ? 'info' : type}">${msg}</div>`;
+}
+
+// Drag-and-drop zone
+function initDropZone(zoneId, inputId) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  if (!zone || !input) return;
+  zone.addEventListener('click',    () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave',() => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+      const dt = new DataTransfer();
+      dt.items.add(e.dataTransfer.files[0]);
+      input.files = dt.files;
+      zone.querySelector('.upload-sub').textContent = e.dataTransfer.files[0].name;
+    }
+  });
+  input.addEventListener('change', () => {
+    if (input.files[0]) zone.querySelector('.upload-sub').textContent = input.files[0].name;
+  });
+}

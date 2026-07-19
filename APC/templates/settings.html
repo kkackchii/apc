@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Target Settings — APC Pre-Production{% endblock %}
+{% block breadcrumb %}Target Settings{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Target Quantity Settings</div>
+    <div class="page-subtitle">Set the pre-production target (MT) for each grade per quarter.</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-ghost" onclick="addRow()"><i class="bi bi-plus"></i> Add Row</button>
+    <button class="btn-primary-custom" onclick="saveTargets()"><i class="bi bi-save"></i> Save All</button>
+    <span id="saveMsg" style="font-size:.78rem;color:var(--success)"></span>
+  </div>
+</div>
+
+<div class="dash-card">
+  <div class="dash-card-header">
+    <div class="dash-card-title">
+      <span class="card-icon"><i class="bi bi-bullseye"></i></span>
+      Grade Targets
+    </div>
+  </div>
+  <table class="settings-table" id="targetTable">
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Grade</th>
+        <th style="text-align:right">Target (MT)</th>
+        <th>Quarter</th>
+        <th style="text-align:center">Remove</th>
+      </tr>
+    </thead>
+    <tbody id="targetBody">
+      {% for t in targets %}
+      <tr data-id="{{ t.id }}">
+        <td>
+          <select name="category">
+            <option {% if t.category == 'Standard' %}selected{% endif %}>Standard</option>
+            <option {% if t.category == 'Precision' %}selected{% endif %}>Precision</option>
+          </select>
+        </td>
+        <td><input name="grade" value="{{ t.grade }}"></td>
+        <td><input name="target_qty_mt" type="number" step="0.1" value="{{ t.target_qty_mt }}" style="text-align:right"></td>
+        <td><input name="quarter" value="{{ t.quarter }}"></td>
+        <td style="text-align:center">
+          <button class="btn-danger-custom" onclick="deleteRow(this, {{ t.id }})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="dash-card">
+  <div class="dash-card-header">
+    <div class="dash-card-title">
+      <span class="card-icon"><i class="bi bi-percent"></i></span>
+      Grade Yield Rates
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn-ghost" onclick="addYieldRow()"><i class="bi bi-plus"></i> Add Row</button>
+      <button class="btn-primary-custom" onclick="saveYieldRates()"><i class="bi bi-save"></i> Save All</button>
+      <span id="saveYieldMsg" style="font-size:.78rem;color:var(--success)"></span>
+    </div>
+  </div>
+  <div style="padding:10px 20px 0;font-size:.76rem;color:var(--text-muted)">
+    Used for the N-code detail page's order/production ratio (target order qty = 3-month avg × 2.5 ÷ yield rate). Unset grades default to 100%.
+  </div>
+  <table class="settings-table" id="yieldTable">
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Grade</th>
+        <th style="text-align:right">Yield Rate (%)</th>
+        <th style="text-align:center">Remove</th>
+      </tr>
+    </thead>
+    <tbody id="yieldBody">
+      {% for y in yield_rates %}
+      <tr data-id="{{ y.id }}">
+        <td>
+          <select name="category">
+            <option {% if y.category == 'Standard' %}selected{% endif %}>Standard</option>
+            <option {% if y.category == 'Precision' %}selected{% endif %}>Precision</option>
+          </select>
+        </td>
+        <td><input name="grade" value="{{ y.grade }}"></td>
+        <td><input name="yield_rate_pct" type="number" step="0.1" value="{{ y.yield_rate_pct }}" style="text-align:right"></td>
+        <td style="text-align:center">
+          <button class="btn-danger-custom" onclick="deleteYieldRow(this, {{ y.id }})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if grades_std or grades_pre %}
+<div class="dash-card">
+  <div class="dash-card-header">
+    <div class="dash-card-title">
+      <span class="card-icon"><i class="bi bi-list-ul"></i></span>
+      Available Grades in Database
+    </div>
+  </div>
+  <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Standard</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for g in grades_std %}
+        <span style="background:var(--primary-light);color:var(--primary);border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:600;cursor:pointer"
+              onclick="quickAdd('Standard', '{{ g }}')">{{ g }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Precision</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for g in grades_pre %}
+        <span style="background:#f0fdf4;color:#057a55;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:600;cursor:pointer"
+              onclick="quickAdd('Precision', '{{ g }}')">{{ g }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div style="padding:0 20px 16px;font-size:.72rem;color:var(--text-muted)">
+    <i class="bi bi-hand-index me-1"></i>Click a grade badge to quickly add it as a new target row.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addRow(cat, grade) {
+  const tbody = document.getElementById('targetBody');
+  const tr = document.createElement('tr');
+  tr.dataset.id = 'new';
+  tr.innerHTML = `
+    <td><select name="category">
+      <option ${cat === 'Standard' ? 'selected' : ''}>Standard</option>
+      <option ${cat === 'Precision' ? 'selected' : ''}>Precision</option>
+    </select></td>
+    <td><input name="grade" value="${grade || ''}" placeholder="e.g. 316L"></td>
+    <td><input name="target_qty_mt" type="number" step="0.1" value="0" style="text-align:right"></td>
+    <td><input name="quarter" value="2025-Q4"></td>
+    <td style="text-align:center">
+      <button class="btn-danger-custom" onclick="deleteRow(this, null)"><i class="bi bi-trash"></i></button>
+    </td>`;
+  tbody.appendChild(tr);
+  tr.querySelector('[name=grade]').focus();
+}
+
+function quickAdd(cat, grade) {
+  addRow(cat, grade);
+}
+
+function deleteRow(btn, id) {
+  const tr = btn.closest('tr');
+  if (id) {
+    fetch(`/api/settings/targets/${id}`, { method: 'DELETE' }).then(() => tr.remove());
+  } else {
+    tr.remove();
+  }
+}
+
+async function saveTargets() {
+  const rows  = document.querySelectorAll('#targetBody tr');
+  const items = [];
+  for (const row of rows) {
+    const cat   = row.querySelector('[name=category]').value;
+    const grade = row.querySelector('[name=grade]').value.trim();
+    const qty   = parseFloat(row.querySelector('[name=target_qty_mt]').value);
+    const qtr   = row.querySelector('[name=quarter]').value.trim();
+    if (grade && !isNaN(qty)) items.push({ category: cat, grade, target_qty_mt: qty, quarter: qtr });
+  }
+  const res  = await fetch('/api/settings/targets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  const data = await res.json();
+  const msg  = document.getElementById('saveMsg');
+  if (data.status === 'ok') {
+    msg.textContent = `✔ ${data.updated} targets saved`;
+    showToast('Targets saved successfully.', 'success');
+    setTimeout(() => location.reload(), 900);
+  } else {
+    msg.textContent = `Error: ${data.error}`;
+    msg.style.color = '#be123c';
+  }
+}
+
+function addYieldRow(cat, grade) {
+  const tbody = document.getElementById('yieldBody');
+  const tr = document.createElement('tr');
+  tr.dataset.id = 'new';
+  tr.innerHTML = `
+    <td><select name="category">
+      <option ${cat === 'Standard' ? 'selected' : ''}>Standard</option>
+      <option ${cat === 'Precision' ? 'selected' : ''}>Precision</option>
+    </select></td>
+    <td><input name="grade" value="${grade || ''}" placeholder="e.g. 316L"></td>
+    <td><input name="yield_rate_pct" type="number" step="0.1" value="100" style="text-align:right"></td>
+    <td style="text-align:center">
+      <button class="btn-danger-custom" onclick="deleteYieldRow(this, null)"><i class="bi bi-trash"></i></button>
+    </td>`;
+  tbody.appendChild(tr);
+  tr.querySelector('[name=grade]').focus();
+}
+
+function deleteYieldRow(btn, id) {
+  const tr = btn.closest('tr');
+  if (id) {
+    fetch(`/api/settings/yield-rates/${id}`, { method: 'DELETE' }).then(() => tr.remove());
+  } else {
+    tr.remove();
+  }
+}
+
+async function saveYieldRates() {
+  const rows  = document.querySelectorAll('#yieldBody tr');
+  const items = [];
+  for (const row of rows) {
+    const cat   = row.querySelector('[name=category]').value;
+    const grade = row.querySelector('[name=grade]').value.trim();
+    const pct   = parseFloat(row.querySelector('[name=yield_rate_pct]').value);
+    if (grade && !isNaN(pct)) items.push({ category: cat, grade, yield_rate_pct: pct });
+  }
+  const res  = await fetch('/api/settings/yield-rates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  const data = await res.json();
+  const msg  = document.getElementById('saveYieldMsg');
+  if (data.status === 'ok') {
+    msg.textContent = `✔ ${data.updated} yield rates saved`;
+    showToast('Yield rates saved successfully.', 'success');
+    setTimeout(() => location.reload(), 900);
+  } else {
+    msg.textContent = `Error: ${data.error}`;
+    msg.style.color = '#be123c';
+  }
+}
+</script>
+{% endblock %}

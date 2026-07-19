@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}Overview — APC Pre-Production{% endblock %}
+{% block breadcrumb %}Overview{% endblock %}
+
+{% block topbar_actions %}
+{% if standard.as_of_date %}
+<span id="asOfDateRef" data-date="{{ standard.as_of_date }}"
+      style="font-size:.78rem;color:var(--text-muted);">
+  <i class="bi bi-calendar3 me-1"></i>As of <strong>{{ standard.as_of_date }}</strong>
+</span>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Grid -->
+<div class="kpi-grid">
+  <!-- Standard Progress -->
+  <div class="kpi-card primary">
+    <div class="kpi-icon"><i class="bi bi-bullseye"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Standard — Achievement</div>
+      <div class="kpi-value">
+        {{ standard.total_progress_pct if standard.total_progress_pct else '—' }}<span class="kpi-unit">%</span>
+      </div>
+      <div class="kpi-sub">{{ standard.chart_produced_mt }} / {{ standard.total_target }} MT</div>
+    </div>
+  </div>
+
+  <!-- Precision Progress -->
+  <div class="kpi-card primary">
+    <div class="kpi-icon"><i class="bi bi-stars"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Precision — Achievement</div>
+      <div class="kpi-value">
+        {{ precision.total_progress_pct if precision.total_progress_pct else '—' }}<span class="kpi-unit">%</span>
+      </div>
+      <div class="kpi-sub">{{ precision.chart_produced_mt }} / {{ precision.total_target }} MT</div>
+    </div>
+  </div>
+
+  <!-- Standard Pending Order Requests -->
+  <a class="kpi-card" href="/order-requests" style="text-decoration:none;color:inherit;{% if pending_std.count %}cursor:pointer{% endif %}">
+    <div class="kpi-icon"><i class="bi bi-clipboard-check"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Standard — Pending Order Requests</div>
+      <div class="kpi-value" style="color:{% if pending_std.count %}#d97706{% endif %}">{{ pending_std.mt }}<span class="kpi-unit">MT</span></div>
+      <div class="kpi-sub">{% if pending_std.count %}{{ pending_std.count }} request{{ 's' if pending_std.count != 1 }} awaiting review{% else %}none pending{% endif %}</div>
+    </div>
+  </a>
+
+  <!-- Precision Pending Order Requests -->
+  <a class="kpi-card" href="/order-requests" style="text-decoration:none;color:inherit;{% if pending_pre.count %}cursor:pointer{% endif %}">
+    <div class="kpi-icon"><i class="bi bi-clipboard-check"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Precision — Pending Order Requests</div>
+      <div class="kpi-value" style="color:{% if pending_pre.count %}#d97706{% endif %}">{{ pending_pre.mt }}<span class="kpi-unit">MT</span></div>
+      <div class="kpi-sub">{% if pending_pre.count %}{{ pending_pre.count }} request{{ 's' if pending_pre.count != 1 }} awaiting review{% else %}none pending{% endif %}</div>
+    </div>
+  </a>
+</div>
+
+<!-- Overview Charts: Standard vs Precision (total Target vs In Transit) -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+  {% for cat_data in [standard, precision] %}
+  <div class="dash-card" style="margin-bottom:0">
+    <div class="dash-card-header">
+      <div class="dash-card-title">
+        <span class="card-icon">
+          <i class="bi bi-{% if cat_data.category == 'Standard' %}grid-3x2{% else %}stars{% endif %}"></i>
+        </span>
+        {{ cat_data.category }} ({% if cat_data.category == 'Standard' %}2B{% else %}Pre{% endif %})
+      </div>
+      <span style="font-size:.72rem;color:var(--text-muted)">Total vs. Produced vs. In Production</span>
+    </div>
+    <div style="padding:20px 24px 24px">
+      <canvas id="overview-chart-{{ cat_data.category | lower }}" height="130"></canvas>
+      <div style="display:flex;justify-content:center;gap:16px;margin-top:14px;font-size:.75rem;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:5px">
+          <span style="width:12px;height:12px;border-radius:3px;background:#10b981;display:inline-block"></span>
+          Produced: <strong>{{ cat_data.chart_produced_mt }} MT</strong>
+        </span>
+        <span style="display:flex;align-items:center;gap:5px">
+          <span style="width:12px;height:12px;border-radius:3px;background:#60a5fa;display:inline-block"></span>
+          In Production: <strong>{{ cat_data.total_in_production }} MT</strong>
+        </span>
+        <span style="display:flex;align-items:center;gap:5px">
+          <span style="width:12px;height:12px;border-radius:3px;background:#e2e8f0;border:1px solid #cbd5e1;display:inline-block"></span>
+          Remaining: <strong>{{ [cat_data.total_target - cat_data.chart_produced_mt - cat_data.total_in_production, 0]|max | round(1) }} MT</strong>
+        </span>
+        <span style="color:var(--text-muted)">/ Target <strong>{{ cat_data.total_target }} MT</strong></span>
+      </div>
+      <div style="text-align:center;margin-top:8px;font-size:.7rem;color:var(--text-muted)">
+        Produced(그래프·KPI) = 15APC In Transit, Surface {% if cat_data.category == 'Standard' %}= 2B{% else %}≠ 2B{% endif %} 전체 합계 · Grade별 표 = N-code 매칭 우선 + 15APC Grade 컬럼 보조
+      </div>
+      {% if cat_data.ncode_match.total_ncodes %}
+      <div style="text-align:center;margin-top:8px;font-size:.7rem;color:var(--text-muted)">
+        N-code match (15APC ↔ {{ '2B_APC' if cat_data.category == 'Standard' else 'Pre_APC' }}):
+        <strong style="color:{% if cat_data.ncode_match.match_pct < 100 %}#d97706{% else %}inherit{% endif %}">
+          {{ cat_data.ncode_match.matched_ncodes }}/{{ cat_data.ncode_match.total_ncodes }} ({{ cat_data.ncode_match.match_pct }}%)
+        </strong>
+        {% if cat_data.ncode_match.unmatched_ncodes %}
+        — unmatched: {{ cat_data.ncode_match.unmatched_ncodes[:8] | join(', ') }}{% if cat_data.ncode_match.unmatched_ncodes|length > 8 %} +{{ cat_data.ncode_match.unmatched_ncodes|length - 8 }} more{% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if unresolved_apc.count %}
+<div class="dash-card" style="margin-bottom:20px;border-left:3px solid #d97706">
+  <div style="padding:12px 20px;font-size:.78rem;color:var(--text-muted)">
+    <i class="bi bi-exclamation-triangle" style="color:#d97706"></i>
+    15APC N-code {{ unresolved_apc.count }}건 ({{ unresolved_apc.total_mt }} MT)이 마스터 시트 N-code와도, 15APC Grade 컬럼으로도
+    매칭되지 않아 Grade별 표에서 제외되었습니다 (그래프·KPI의 Surface 기준 합계에는 포함):
+    {{ unresolved_apc.ncodes[:5] | map(attribute='ncode') | join(', ') }}{% if unresolved_apc.ncodes|length > 5 %} 외{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Summary Tables Card -->
+<div class="dash-card">
+  <!-- Tabs -->
+  <div class="dash-tabs">
+    <button class="dash-tab active" onclick="switchTab('tab-standard', this)">
+      <i class="bi bi-grid-3x2 me-1"></i>Standard (2B)
+    </button>
+    <button class="dash-tab" onclick="switchTab('tab-precision', this)">
+      <i class="bi bi-stars me-1"></i>Precision (Pre)
+    </button>
+  </div>
+
+  {% for tab_id, cat_data in [('tab-standard', standard), ('tab-precision', precision)] %}
+  {% set M = cat_data.months|length %}
+  <div id="{{ tab_id }}" class="tab-panel {% if loop.first %}active{% endif %}">
+    <!-- Summary table -->
+    <div class="summary-table-wrap">
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th rowspan="2" style="min-width:110px" class="th-sort" data-sortable onclick="sortSummary(this, 0)" title="Click to sort">Grade</th>
+            <th rowspan="2" class="num-cell border-l th-sort" data-sortable onclick="sortSummary(this, 1)" title="Click to sort">Target<br>(MT)</th>
+            <th colspan="2" class="text-center border-l">SDG Order</th>
+            {% if cat_data.months %}
+            <th colspan="{{ M + 2 }}" class="text-center border-l">OTX Production Order (MT)</th>
+            {% endif %}
+            <th rowspan="2" class="num-cell border-l th-sort" style="min-width:70px" data-sortable onclick="sortSummary(this, {{ 6 + M }})" title="Click to sort">Input<br>Rate</th>
+            <th colspan="2" class="text-center border-l">Produced</th>
+          </tr>
+          <tr class="sub-header">
+            <th class="num-cell border-l th-sort" data-sortable onclick="sortSummary(this, 2)" title="Click to sort">MT</th>
+            <th class="num-cell th-sort" data-sortable onclick="sortSummary(this, 3)" title="Click to sort">Progress</th>
+            {% for m in cat_data.months %}
+            <th class="month-cell border-l">{{ m[5:] }}</th>
+            {% endfor %}
+            <th class="num-cell border-l th-sort" data-sortable onclick="sortSummary(this, {{ 4 + M }})" title="Click to sort">Sum</th>
+            <th class="num-cell th-sort" data-sortable onclick="sortSummary(this, {{ 5 + M }})" title="Click to sort">Balance</th>
+            <th class="num-cell border-l th-sort" data-sortable onclick="sortSummary(this, {{ 7 + M }})" title="Click to sort">MT</th>
+            <th class="num-cell progress-cell th-sort" style="min-width:120px" data-sortable onclick="sortSummary(this, {{ 8 + M }})" title="Click to sort">Progress</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in cat_data.rows %}
+          {% set ppct = row.progress_pct or 0 %}
+          {% set bar_cls = 'good' if ppct >= 100 else ('warn' if ppct >= 50 else 'danger') %}
+          <tr>
+            <td class="grade-cell">
+              <a href="/detail/{{ cat_data.category }}/{{ row.grade }}">{{ row.grade }}</a>
+              <span class="ncode-badge">{{ row.ncode_count }}</span>
+            </td>
+            <td class="num-cell border-l">{{ row.target_mt if row.target_mt else '—' }}</td>
+
+            <!-- SDG Order -->
+            <td class="num-cell border-l">
+              {{ '%.1f'|format(row.sdg_order_mt) if row.sdg_order_mt else '—' }}
+              {% if row.delta_sdg and row.delta_sdg != 0 %}
+                <span class="delta {% if row.delta_sdg > 0 %}delta-up{% else %}delta-down{% endif %}">
+                  {{ '▲' if row.delta_sdg > 0 else '▼' }}{{ '%.1f'|format(row.delta_sdg|abs) }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="num-cell">
+              {% if row.sdg_order_pct %}
+                <span class="rate-badge {% if row.sdg_order_pct >= 100 %}rate-good{% elif row.sdg_order_pct >= 70 %}rate-warn{% else %}rate-danger{% endif %}">
+                  {{ row.sdg_order_pct }}%
+                </span>
+              {% else %}—{% endif %}
+            </td>
+
+            <!-- Monthly OTX -->
+            {% for m in cat_data.months %}
+            <td class="month-cell border-l">{{ row.monthly_apc.get(m, '') or '' }}</td>
+            {% endfor %}
+            <td class="num-cell border-l fw-bold">{{ row.plan_sum_mt if row.plan_sum_mt else '—' }}</td>
+            <td class="num-cell {% if row.order_balance_mt and row.order_balance_mt < 0 %}text-danger{% endif %}" style="color: {% if row.order_balance_mt and row.order_balance_mt < 0 %}#be123c{% endif %}">
+              {{ '%.1f'|format(row.order_balance_mt) if row.order_balance_mt else '—' }}
+            </td>
+
+            <!-- Input Rate -->
+            <td class="num-cell border-l">
+              {% if row.input_rate_pct %}
+                <span class="rate-badge {% if row.input_rate_pct >= 90 %}rate-good{% elif row.input_rate_pct >= 60 %}rate-warn{% else %}rate-danger{% endif %}">
+                  {{ row.input_rate_pct }}%
+                </span>
+              {% else %}—{% endif %}
+            </td>
+
+            <!-- Produced -->
+            <td class="num-cell border-l">
+              {{ '%.2f'|format(row.produced_mt) if row.produced_mt else '—' }}
+              {% if row.delta_produced and row.delta_produced != 0 %}
+                <span class="delta {% if row.delta_produced > 0 %}delta-up{% else %}delta-down{% endif %}">
+                  {{ '▲' if row.delta_produced > 0 else '▼' }}{{ '%.2f'|format(row.delta_produced|abs) }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="num-cell progress-cell">
+              <div class="pct-text" style="color:{{ 'var(--success)' if ppct >= 100 else ('#f59e0b' if ppct >= 50 else '#ef4444') }}">
+                {{ row.progress_pct }}%
+              </div>
+              <div class="inline-progress">
+                <div class="inline-progress-bar {{ bar_cls }}" style="width:{{ [ppct, 100]|min }}%"></div>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="20" style="text-align:center;padding:32px;color:var(--text-muted);">
+              No data — please upload a CSV file first.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if cat_data.rows %}
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="num-cell border-l">{{ cat_data.total_target }}</td>
+            <td class="num-cell border-l">{{ cat_data.total_sdg_order }}</td>
+            <td class="num-cell">
+              {% if cat_data.total_target > 0 %}
+                {{ (cat_data.total_sdg_order / cat_data.total_target * 100)|round(1) }}%
+              {% endif %}
+            </td>
+            {% for m in cat_data.months %}
+            <td class="month-cell border-l"></td>
+            {% endfor %}
+            <td class="num-cell border-l">{{ cat_data.total_plan_sum }}</td>
+            <td></td>
+            <td class="num-cell border-l"></td>
+            <td class="num-cell border-l">{{ cat_data.total_produced }}</td>
+            <td class="num-cell">
+              <strong>{{ cat_data.total_progress_pct }}%</strong>
+            </td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+
+    <!-- Achievement bar -->
+    {% if cat_data.total_progress_pct is not none %}
+    <div class="achievement-bar-wrap">
+      <div class="achievement-label">
+        <span>Overall Achievement Rate</span>
+        <span style="font-weight:700;color:var(--primary)">{{ cat_data.total_progress_pct }}%</span>
+      </div>
+      <div class="achievement-track">
+        <div class="achievement-fill" style="width:{{ [cat_data.total_progress_pct, 100]|min }}%">
+          <span class="achievement-pct">{{ cat_data.total_progress_pct }}%</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Comments -->
+<div class="dash-card">
+  <div class="dash-card-header">
+    <div class="dash-card-title">
+      <span class="card-icon"><i class="bi bi-chat-left-text"></i></span>
+      Weekly Notes / Issues
+    </div>
+    <button class="btn-primary-custom" onclick="saveComment()">
+      <i class="bi bi-save"></i> Save
+    </button>
+  </div>
+  <div class="comment-box">
+    {% if comment %}
+    <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:6px;">Last saved: {{ comment.as_of_date }}</div>
+    {% endif %}
+    <textarea class="comment-textarea" id="commentText"
+      placeholder="Enter weekly issues, action items, special notes...">{% if comment %}{{ comment.content }}{% endif %}</textarea>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const stdData = {{ standard | tojson }};
+const preData = {{ precision | tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderTotalChart('overview-chart-standard', stdData);
+  renderTotalChart('overview-chart-precision', preData);
+});
+
+// Column sorting for the grade summary tables. Numeric cells sort by their first
+// number (so delta arrows / % suffixes are ignored); text cells (Grade) sort A→Z.
+function sortSummary(th, tdIdx) {
+  const table = th.closest('table');
+  const tbody = table.querySelector('tbody');
+  const dir = th.dataset.dir === 'desc' ? 'asc' : 'desc';
+  table.querySelectorAll('th[data-sortable]').forEach(h => {
+    delete h.dataset.dir;
+    const ind = h.querySelector('.sort-ind');
+    if (ind) ind.remove();
+  });
+  th.dataset.dir = dir;
+  const rows = [...tbody.querySelectorAll('tr')].filter(r => r.cells.length > 5);
+  const num = t => { const v = parseFloat(String(t).replace(/[,%]/g, '').trim()); return isNaN(v) ? null : v; };
+  rows.sort((a, b) => {
+    const ta = a.cells[tdIdx] ? a.cells[tdIdx].innerText : '';
+    const tb = b.cells[tdIdx] ? b.cells[tdIdx].innerText : '';
+    const na = num(ta), nb = num(tb);
+    const cmp = (na === null && nb === null)
+      ? ta.localeCompare(tb)
+      : (na ?? -Infinity) - (nb ?? -Infinity);
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  const ind = document.createElement('span');
+  ind.className = 'sort-ind';
+  ind.textContent = dir === 'asc' ? ' ↑' : ' ↓';
+  th.appendChild(ind);
+}
+</script>
+{% endblock %}

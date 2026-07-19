@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Order Requests — APC Pre-Production{% endblock %}
+{% block breadcrumb %}Order Requests{% endblock %}
+
+{% block content %}
+
+<div class="dash-card">
+  <div class="dash-card-header">
+    <div class="dash-card-title">
+      <span class="card-icon"><i class="bi bi-clipboard-check"></i></span>
+      Order Requests
+    </div>
+    <div class="dash-tabs" style="padding:0;border-bottom:none">
+      <button class="dash-tab active" onclick="switchStatusTab('pending', this)">Pending</button>
+      <button class="dash-tab" onclick="switchStatusTab('approved', this)">Approved</button>
+      <button class="dash-tab" onclick="switchStatusTab('sent', this)">Sent to Factory</button>
+      <button class="dash-tab" onclick="switchStatusTab('rejected', this)">Rejected</button>
+      <button class="dash-tab" onclick="switchStatusTab('', this)">All</button>
+    </div>
+  </div>
+  <div style="padding:8px 20px 0;font-size:.72rem;color:var(--text-muted)">
+    No login system — anyone can submit or review a request. Requests are submitted from an N-code's page on the
+    <a href="/dashboard-v2">N-code Dashboard</a>.
+  </div>
+  <div class="summary-table-wrap">
+    <table class="summary-table" id="reqTable">
+      <thead>
+        <tr>
+          <th>N-code</th>
+          <th>Covers N-code</th>
+          <th>Grade</th>
+          <th class="num-cell border-l">Requested<br>(MT)</th>
+          <th>Requested By</th>
+          <th>Requested At</th>
+          <th>Note</th>
+          <th>Reviewed By</th>
+          <th style="min-width:220px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="reqBody">
+        <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentStatus = 'pending';
+
+function switchStatusTab(status, el) {
+  currentStatus = status;
+  document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadRequests();
+}
+
+function statusBadge(status) {
+  const map = {
+    pending: 'rate-warn', approved: 'rate-good', sent: 'rate-good', rejected: 'rate-danger',
+  };
+  return `<span class="rate-badge ${map[status] || ''}">${status.toUpperCase()}</span>`;
+}
+
+async function loadRequests() {
+  const url = currentStatus ? `/api/order-requests?status=${currentStatus}` : '/api/order-requests';
+  const res = await fetch(url);
+  const data = await res.json();
+  const body = document.getElementById('reqBody');
+  if (!data.requests.length) {
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-muted)">No requests.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.requests.map(r => `
+    <tr>
+      <td class="grade-cell"><a href="/dashboard-v2?category=${encodeURIComponent(r.category)}&ncode=${encodeURIComponent(r.n_code)}" target="_blank">${r.n_code}</a></td>
+      <td style="font-family:monospace;font-size:.78rem">${r.covers_n_code || '—'}</td>
+      <td>${r.grade || '—'}</td>
+      <td class="num-cell border-l">${r.requested_mt.toLocaleString(undefined,{maximumFractionDigits:3})}</td>
+      <td>${r.requested_by || '—'}</td>
+      <td style="font-size:.75rem;color:var(--text-muted)">${(r.requested_at || '').slice(0,16)}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:.78rem" title="${r.note || ''}">${r.note || '—'}</td>
+      <td style="font-size:.78rem">${r.reviewed_by ? `${r.reviewed_by} ${statusBadge(r.status)}` : statusBadge(r.status)}</td>
+      <td>${actionButtons(r)}</td>
+    </tr>`).join('');
+}
+
+function actionButtons(r) {
+  if (r.status === 'pending') {
+    return `
+      <button class="btn-primary-custom" style="padding:4px 10px;font-size:.74rem" onclick="review(${r.id},'approve')"><i class="bi bi-check-lg"></i> Approve</button>
+      <button class="btn-danger-custom" style="padding:4px 10px;font-size:.74rem" onclick="review(${r.id},'reject')"><i class="bi bi-x-lg"></i> Reject</button>
+      <button class="btn-ghost" style="padding:4px 10px;font-size:.74rem" onclick="withdraw(${r.id})"><i class="bi bi-trash"></i> Withdraw</button>`;
+  }
+  if (r.status === 'approved') {
+    return `<button class="btn-primary-custom" style="padding:4px 10px;font-size:.74rem" onclick="review(${r.id},'mark-sent')"><i class="bi bi-truck"></i> Mark Sent to Factory</button>`;
+  }
+  return '';
+}
+
+async function review(id, action) {
+  const reviewedBy = prompt('Your name:');
+  if (!reviewedBy) return;
+  const note = action === 'reject' ? (prompt('Reason (optional):') || '') : '';
+  const res = await fetch(`/api/order-requests/${id}/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewed_by: reviewedBy, note }),
+  });
+  const data = await res.json();
+  if (data.status === 'ok') {
+    showToast('Updated.', 'success');
+    loadRequests();
+  } else {
+    showToast('Failed: ' + data.error, 'error');
+  }
+}
+
+async function withdraw(id) {
+  if (!confirm('Withdraw this request?')) return;
+  const res = await fetch(`/api/order-requests/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.status === 'ok') {
+    showToast('Withdrawn.', 'success');
+    loadRequests();
+  } else {
+    showToast('Failed: ' + data.error, 'error');
+  }
+}
+
+loadRequests();
+</script>
+{% endblock %}
